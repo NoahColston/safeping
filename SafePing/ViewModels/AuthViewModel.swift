@@ -7,11 +7,21 @@ class AuthViewModel: ObservableObject {
     @Published var isAuthenticated = false
     @Published var currentUser: User?
     @Published var errorMessage: String?
+    @Published var onboardingComplete = false
 
     /// True when the user is logged in but has not yet selected a role
-    var needsOnboarding: Bool {
+    var needsRoleSelection: Bool {
         guard let user = currentUser else { return false }
         return user.role == nil
+    }
+
+    /// True when the user has a role but onboarding isn't finished
+    /// (e.g. notification permission step for check-in users)
+    var needsOnboarding: Bool {
+        guard isAuthenticated, let user = currentUser else { return false }
+        if user.role == nil { return true }
+        if !onboardingComplete { return true }
+        return false
     }
 
     // MARK: - In-memory user store (replace with real persistence later)
@@ -60,6 +70,8 @@ class AuthViewModel: ObservableObject {
         if let user = users[username], user.password == password {
             currentUser = user
             isAuthenticated = true
+            // If user already has a role, skip onboarding
+            onboardingComplete = user.role != nil
         } else {
             errorMessage = "Invalid username or password."
         }
@@ -89,6 +101,7 @@ class AuthViewModel: ObservableObject {
         users[trimmedUsername] = newUser
         currentUser = newUser
         isAuthenticated = true
+        onboardingComplete = false
 
         return ValidationResult(isValid: true)
     }
@@ -98,8 +111,17 @@ class AuthViewModel: ObservableObject {
         guard var user = currentUser else { return }
         user.role = role
         currentUser = user
-        // Persist back to the in-memory store
         users[user.username] = user
+
+        // Checkers don't need the notification step — finish onboarding
+        if role == .checker {
+            onboardingComplete = true
+        }
+    }
+
+    // MARK: - Complete Onboarding
+    func completeOnboarding() {
+        onboardingComplete = true
     }
 
     // MARK: - Logout
@@ -107,5 +129,6 @@ class AuthViewModel: ObservableObject {
         currentUser = nil
         isAuthenticated = false
         errorMessage = nil
+        onboardingComplete = false
     }
 }

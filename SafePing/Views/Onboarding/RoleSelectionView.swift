@@ -48,6 +48,8 @@ struct RoleSelectionView: View {
             SafePingButton(title: "Continue") {
                 if let role = selectedRole {
                     authViewModel.setRole(role)
+                    // If checker, onboarding is already marked complete in setRole
+                    // If check-in user, ContentView routes to NotificationPermissionView
                 }
             }
             .opacity(selectedRole == nil ? 0.4 : 1.0)
