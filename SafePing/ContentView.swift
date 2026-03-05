@@ -5,15 +5,18 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if authViewModel.isAuthenticated {
-                HomeView()
-            } else {
+            if !authViewModel.isAuthenticated {
                 NavigationStack {
                     LoginView()
                 }
+            } else if authViewModel.needsOnboarding {
+                RoleSelectionView()
+            } else {
+                HomeView()
             }
         }
         .animation(.easeInOut(duration: 0.3), value: authViewModel.isAuthenticated)
+        .animation(.easeInOut(duration: 0.3), value: authViewModel.needsOnboarding)
     }
 }
 

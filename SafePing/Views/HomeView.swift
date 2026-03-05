@@ -15,7 +15,22 @@ struct HomeView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.safePingDark)
 
-                Text("You're all set. Your SafePing dashboard is coming soon.")
+                if let role = authViewModel.currentUser?.role {
+                    HStack(spacing: 8) {
+                        Image(systemName: role.iconName)
+                            .font(.system(size: 14))
+                            .foregroundColor(.safePingGreenEnd)
+                        Text(role.displayName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.safePingGreenEnd)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Color.safePingSuccessBg)
+                    .cornerRadius(20)
+                }
+
+                Text("Your SafePing dashboard is coming soon.")
                     .font(.system(size: 15))
                     .foregroundColor(.safePingTextMuted)
                     .multilineTextAlignment(.center)
@@ -46,7 +61,7 @@ struct HomeView: View {
 
 #Preview {
     let vm = AuthViewModel()
-    vm.currentUser = User(username: "testuser", password: "")
+    vm.currentUser = User(username: "testuser", password: "", role: .checkInUser)
     vm.isAuthenticated = true
     return HomeView().environmentObject(vm)
 }

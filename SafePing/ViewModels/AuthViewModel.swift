@@ -8,6 +8,12 @@ class AuthViewModel: ObservableObject {
     @Published var currentUser: User?
     @Published var errorMessage: String?
 
+    /// True when the user is logged in but has not yet selected a role
+    var needsOnboarding: Bool {
+        guard let user = currentUser else { return false }
+        return user.role == nil
+    }
+
     // MARK: - In-memory user store (replace with real persistence later)
     private var users: [String: User] = [
         "admin": User(username: "admin", password: "password")
@@ -78,13 +84,22 @@ class AuthViewModel: ObservableObject {
             return ValidationResult(isValid: false, usernameError: "That username is already taken.")
         }
 
-        // Create account and auto-login
+        // Create account and auto-login (role is nil — triggers onboarding)
         let newUser = User(username: trimmedUsername, password: password)
         users[trimmedUsername] = newUser
         currentUser = newUser
         isAuthenticated = true
 
         return ValidationResult(isValid: true)
+    }
+
+    // MARK: - Role Selection
+    func setRole(_ role: UserRole) {
+        guard var user = currentUser else { return }
+        user.role = role
+        currentUser = user
+        // Persist back to the in-memory store
+        users[user.username] = user
     }
 
     // MARK: - Logout
