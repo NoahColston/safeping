@@ -69,8 +69,8 @@ struct NotificationPermissionView: View {
             .padding(.bottom, 40)
         }
         .background(Color.safePingBg.ignoresSafeArea())
-        .onChange(of: hasResponded) { responded in
-            if responded {
+        .onChange(of: hasResponded) {
+            if hasResponded {
                 authViewModel.completeOnboarding()
             }
         }

@@ -13,10 +13,18 @@ struct ContentView: View {
             } else if authViewModel.needsRoleSelection {
                 RoleSelectionView()
             } else if !authViewModel.onboardingComplete {
-                // Check-in users see the notification permission screen
                 NotificationPermissionView(notificationService: notificationService)
             } else {
-                HomeView()
+                // Route to the correct dashboard based on role
+                switch authViewModel.currentUser?.role {
+                case .checker:
+                    CheckerDashboardView()
+                case .checkInUser:
+                    CheckInUserDashboardView()
+                case .none:
+                    // Fallback — shouldn't reach here
+                    RoleSelectionView()
+                }
             }
         }
         .animation(.easeInOut(duration: 0.3), value: authViewModel.isAuthenticated)

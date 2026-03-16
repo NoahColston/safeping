@@ -51,7 +51,7 @@ struct RegisterView: View {
                         text: $username,
                         errorMessage: usernameError
                     )
-                    .onChange(of: username) { _ in usernameError = nil }
+                    .onChange(of: username) { usernameError = nil }
 
                     SafePingTextField(
                         label: "Password",
@@ -60,7 +60,7 @@ struct RegisterView: View {
                         isSecure: true,
                         errorMessage: passwordError
                     )
-                    .onChange(of: password) { _ in passwordError = nil }
+                    .onChange(of: password) { passwordError = nil }
 
                     SafePingTextField(
                         label: "Confirm Password",
@@ -69,7 +69,7 @@ struct RegisterView: View {
                         isSecure: true,
                         errorMessage: confirmError
                     )
-                    .onChange(of: confirmPassword) { _ in confirmError = nil }
+                    .onChange(of: confirmPassword) { confirmError = nil }
 
                     SafePingButton(title: "Create Account") {
                         attemptRegistration()
