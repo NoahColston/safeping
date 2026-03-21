@@ -80,12 +80,16 @@ struct CheckInUserDashboardView: View {
 
                             Button(action: {
                                 if !alreadyCheckedIn {
-                                    checkInViewModel.performCheckIn()
+                                    Task {
+                                        await checkInViewModel.performCheckIn(
+                                            username: authViewModel.currentUser?.username ?? ""
+                                        )
+                                    }
                                     withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
                                         justCheckedIn = true
                                     }
                                 }
-                            }) {
+                            }){
                                 HStack(spacing: 10) {
                                     Image(systemName: alreadyCheckedIn ? "checkmark.circle.fill" : "hand.wave.fill")
                                         .font(.system(size: 22))
@@ -131,7 +135,9 @@ struct CheckInUserDashboardView: View {
         .background(Color.safePingBg.ignoresSafeArea())
         .onAppear {
             if let user = authViewModel.currentUser {
-                checkInViewModel.loadMockData(for: user.username, role: .checkInUser)
+                Task {
+                    await checkInViewModel.loadData(for: user.username, role: .checkInUser)
+                }
             }
         }
     }

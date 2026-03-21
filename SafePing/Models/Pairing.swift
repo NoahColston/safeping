@@ -1,5 +1,6 @@
 import Foundation
 
+// MARK: - Check-in Schedule
 enum CheckInFrequency: String, Codable, CaseIterable {
     case daily = "Every Day"
     case weekly = "Weekly"
@@ -10,7 +11,6 @@ enum CheckInFrequency: String, Codable, CaseIterable {
 struct CheckInSchedule: Codable {
     var time: Date
     var frequency: CheckInFrequency
-    // For weekly frequency, which days are active (1 = Sunday, 7 = Saturday)
     var activeDays: Set<Int>
 
     init(
@@ -23,30 +23,27 @@ struct CheckInSchedule: Codable {
         self.activeDays = activeDays
     }
 
-    // Returns the hour component of the scheduled time
     var hour: Int {
         Calendar.current.component(.hour, from: time)
     }
 
-    // Returns the minute component of the scheduled time
     var minute: Int {
         Calendar.current.component(.minute, from: time)
     }
 
-    // Formatted time string (e.g. "9:41 AM")
     var formattedTime: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: time)
     }
 
-    // Whether a given weekday is scheduled
     func isScheduled(weekday: Int) -> Bool {
         if frequency == .daily { return true }
         return activeDays.contains(weekday)
     }
 }
 
+// MARK: - Pairing
 struct Pairing: Identifiable, Codable {
     let id: UUID
     let checkerUsername: String
@@ -68,7 +65,6 @@ struct Pairing: Identifiable, Codable {
         self.checkIns = checkIns
     }
 
-    // Current streak of consecutive check-ins (counting backward from today)
     var currentStreak: Int {
         let calendar = Calendar.current
         let sorted = checkIns
@@ -90,13 +86,11 @@ struct Pairing: Identifiable, Codable {
         return streak
     }
 
-    // Status for a specific date
     func status(for date: Date) -> CheckInStatus? {
         let calendar = Calendar.current
         return checkIns.first { calendar.isDate($0.date, inSameDayAs: date) }?.status
     }
 
-    // Last check-in that was completed
     var lastCheckIn: CheckIn? {
         checkIns
             .filter { $0.status == .checkedIn }
@@ -104,7 +98,6 @@ struct Pairing: Identifiable, Codable {
             .first
     }
 
-    // Time since last check-in as a human-readable string
     var timeSinceLastCheckIn: String {
         guard let last = lastCheckIn else { return "No check-ins yet" }
         let interval = Date().timeIntervalSince(last.date)
@@ -121,7 +114,6 @@ struct Pairing: Identifiable, Codable {
         }
     }
 
-    // Formatted string for last check-in date
     var lastCheckInDescription: String {
         guard let last = lastCheckIn else { return "" }
         let formatter = DateFormatter()

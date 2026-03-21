@@ -77,8 +77,13 @@ struct CheckerDashboardView: View {
         .background(Color.safePingBg.ignoresSafeArea())
         .onAppear {
             if let user = authViewModel.currentUser {
-                checkInViewModel.loadMockData(for: user.username, role: .checker)
+                Task {
+                    await checkInViewModel.loadData(for: user.username, role: .checker)
+                }
             }
+        }
+        .onDisappear {
+            checkInViewModel.stopListening()
         }
     }
 }

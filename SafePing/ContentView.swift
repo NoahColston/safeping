@@ -14,15 +14,15 @@ struct ContentView: View {
                 RoleSelectionView()
             } else if !authViewModel.onboardingComplete {
                 NotificationPermissionView(notificationService: notificationService)
+            } else if !authViewModel.pairingComplete {
+                PairingFlowView()
             } else {
-                // Route to the correct dashboard based on role
                 switch authViewModel.currentUser?.role {
                 case .checker:
                     CheckerDashboardView()
                 case .checkInUser:
                     CheckInUserDashboardView()
                 case .none:
-                    // Fallback — shouldn't reach here
                     RoleSelectionView()
                 }
             }
@@ -30,6 +30,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: authViewModel.isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: authViewModel.needsOnboarding)
         .animation(.easeInOut(duration: 0.3), value: authViewModel.onboardingComplete)
+        .animation(.easeInOut(duration: 0.3), value: authViewModel.pairingComplete)
     }
 }
 

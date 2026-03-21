@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B0C3747E2F6EE7140078733A /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B0C3747D2F6EE7140078733A /* FirebaseFirestore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		C7798B052F58AF5E0076110A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0C3747E2F6EE7140078733A /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,12 +77,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B0C3747C2F6EE7140078733A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		C7798AEB2F58AF590076110A = {
 			isa = PBXGroup;
 			children = (
 				C7798AF62F58AF5A0076110A /* SafePing */,
 				C7798B072F58AF5E0076110A /* SafePingTests */,
 				C7798B112F58AF5F0076110A /* SafePingUITests */,
+				B0C3747C2F6EE7140078733A /* Frameworks */,
 				C7798AF52F58AF5A0076110A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -112,6 +125,7 @@
 			);
 			name = SafePing;
 			packageProductDependencies = (
+				B0C3747D2F6EE7140078733A /* FirebaseFirestore */,
 			);
 			productName = SafePing;
 			productReference = C7798AF42F58AF5A0076110A /* SafePing.app */;
@@ -195,6 +209,9 @@
 			);
 			mainGroup = C7798AEB2F58AF590076110A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B0C3747B2F6EE4B90078733A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C7798AF52F58AF5A0076110A /* Products */;
 			projectDirPath = "";
@@ -393,9 +410,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SafePing/SafePing.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SafePing/Preview Content\"";
+				DEVELOPMENT_TEAM = 73DQWPP2RC;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -421,9 +440,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SafePing/SafePing.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SafePing/Preview Content\"";
+				DEVELOPMENT_TEAM = 73DQWPP2RC;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -552,6 +573,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B0C3747B2F6EE4B90078733A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.11.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B0C3747D2F6EE7140078733A /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0C3747B2F6EE4B90078733A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C7798AEC2F58AF590076110A /* Project object */;
 }

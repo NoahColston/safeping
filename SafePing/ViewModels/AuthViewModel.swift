@@ -8,6 +8,7 @@ class AuthViewModel: ObservableObject {
     @Published var currentUser: User?
     @Published var errorMessage: String?
     @Published var onboardingComplete = false
+    @Published var pairingComplete: Bool = false
 
     /// True when the user is logged in but has not yet selected a role
     var needsRoleSelection: Bool {
@@ -16,7 +17,6 @@ class AuthViewModel: ObservableObject {
     }
 
     /// True when the user has a role but onboarding isn't finished
-    /// (e.g. notification permission step for check-in users)
     var needsOnboarding: Bool {
         guard isAuthenticated, let user = currentUser else { return false }
         if user.role == nil { return true }
@@ -72,9 +72,25 @@ class AuthViewModel: ObservableObject {
             isAuthenticated = true
             // If user already has a role, skip onboarding
             onboardingComplete = user.role != nil
+            // Load pairing state for this user
+            loadPairingState()
         } else {
             errorMessage = "Invalid username or password."
         }
+    }
+
+    // MARK: - Pairing
+    func completePairing() {
+        pairingComplete = true
+        UserDefaults.standard.set(
+            true,
+            forKey: "pairingComplete_\(currentUser?.id.uuidString ?? "")"
+        )
+    }
+
+    func loadPairingState() {
+        let key = "pairingComplete_\(currentUser?.id.uuidString ?? "")"
+        pairingComplete = UserDefaults.standard.bool(forKey: key)
     }
 
     // MARK: - Register (auto-login on success)
@@ -102,6 +118,8 @@ class AuthViewModel: ObservableObject {
         currentUser = newUser
         isAuthenticated = true
         onboardingComplete = false
+        // New users always start unpaired
+        pairingComplete = false
 
         return ValidationResult(isValid: true)
     }
@@ -130,5 +148,6 @@ class AuthViewModel: ObservableObject {
         isAuthenticated = false
         errorMessage = nil
         onboardingComplete = false
+        pairingComplete = false
     }
 }
