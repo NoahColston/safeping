@@ -3,7 +3,7 @@ import SwiftUI
 struct CheckInUserDashboardView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var checkInViewModel = CheckInViewModel()
-    @StateObject private var notificationService = NotificationService()
+    @EnvironmentObject var notificationService: NotificationService
 
     @State private var justCheckedIn = false
     @State private var showPairingCode = false
@@ -102,7 +102,8 @@ struct CheckInUserDashboardView: View {
                         notificationService.scheduleCheckInReminder(
                             message: msg,
                             hour: pairing.schedule.hour,
-                            minute: pairing.schedule.minute
+                            minute: pairing.schedule.minute,
+                            username: authViewModel.currentUser?.username ?? ""
                         )
                     }
                 }

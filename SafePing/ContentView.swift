@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @StateObject private var notificationService = NotificationService()
+    @EnvironmentObject var notificationService: NotificationService
 
     var body: some View {
         Group {
