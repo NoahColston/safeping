@@ -4,7 +4,7 @@ import FirebaseFirestore
 class PairingService {
     private let db = Firestore.firestore()
     
-    // MARK: - Checkee: generate a 6-digit code and save to Firebase
+    // MARK: Checkee: generate a 6-digit code and save to Firebase
     func generatePairingCode(for checkeeUsername: String) async throws -> String {
         let code = String(format: "%06d", Int.random(in: 0...999999))
         let now = Date()
@@ -25,7 +25,7 @@ class PairingService {
         return code
     }
     
-    // MARK: - Checker: look up code and create the pair
+    // MARK: Checker: look up code and create the pair
     func redeemPairingCode(_ code: String, checkerUsername: String) async throws -> Pairing {
         let doc = try await db.collection("pairingCodes")
             .document(code)
@@ -69,6 +69,13 @@ class PairingService {
         return pairing
     }
     
+    // MARK: Remove a pairing (Story 13)
+    func removePairing(pairingId: UUID) async throws {
+        try await db.collection("pairs")
+            .document(pairingId.uuidString)
+            .delete()
+    }
+
     // MARK: - Fetch all pairings for a checker
     func fetchPairings(for checkerUsername: String) async throws -> [Pairing] {
         let snapshot = try await db.collection("pairs")

@@ -50,19 +50,22 @@ struct Pairing: Identifiable, Codable {
     let checkInUsername: String
     var schedule: CheckInSchedule
     var checkIns: [CheckIn]
+    var customReminderMessage: String  // Story 14
 
     init(
         id: UUID = UUID(),
         checkerUsername: String,
         checkInUsername: String,
         schedule: CheckInSchedule = CheckInSchedule(),
-        checkIns: [CheckIn] = []
+        checkIns: [CheckIn] = [],
+        customReminderMessage: String = ""
     ) {
         self.id = id
         self.checkerUsername = checkerUsername
         self.checkInUsername = checkInUsername
         self.schedule = schedule
         self.checkIns = checkIns
+        self.customReminderMessage = customReminderMessage
     }
 
     var currentStreak: Int {

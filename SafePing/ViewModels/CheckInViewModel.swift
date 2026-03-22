@@ -10,6 +10,7 @@ class CheckInViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let db = Firestore.firestore()
+    private let pairingService = PairingService()
     private var listeners: [ListenerRegistration] = []
 
     var selectedPairing: Pairing? {
@@ -22,10 +23,18 @@ class CheckInViewModel: ObservableObject {
         return pairings.firstIndex { $0.id == id }
     }
 
-    // MARK: - Stop all listeners when done
+    // MARK: - Stop all listeners
     func stopListening() {
         listeners.forEach { $0.remove() }
         listeners.removeAll()
+    }
+
+    // MARK: - Restart listeners for current pairings
+    private func restartListeners() {
+        stopListening()
+        for pairing in pairings {
+            startCheckInListener(for: pairing.checkInUsername)
+        }
     }
 
     // MARK: - Load data and start live listeners
@@ -36,7 +45,6 @@ class CheckInViewModel: ObservableObject {
 
         let field = role == .checker ? "checkerUsername" : "checkInUsername"
 
-        // First load the pairs
         do {
             let snapshot = try await db.collection("pairs")
                 .whereField(field, isEqualTo: username)
@@ -51,20 +59,26 @@ class CheckInViewModel: ObservableObject {
                     let checkInUsername = data["checkInUsername"] as? String
                 else { continue }
 
+                // Use the stored Firestore doc ID as the pairing UUID so unpair/updates work
+                let storedId = UUID(uuidString: doc.documentID) ?? UUID()
+                let customMsg = data["customReminderMessage"] as? String ?? ""
                 let checkIns = try await fetchCheckIns(for: checkInUsername)
 
                 let pairing = Pairing(
+                    id: storedId,
                     checkerUsername: checkerUsername,
                     checkInUsername: checkInUsername,
-                    checkIns: checkIns
+                    checkIns: checkIns,
+                    customReminderMessage: customMsg
                 )
                 loadedPairings.append(pairing)
             }
 
             pairings = loadedPairings
-            selectedPairingId = pairings.first?.id
+            if selectedPairingId == nil || !pairings.contains(where: { $0.id == selectedPairingId }) {
+                selectedPairingId = pairings.first?.id
+            }
 
-            // Now start live listeners for each paired checkee's check-ins
             for pairing in pairings {
                 startCheckInListener(for: pairing.checkInUsername)
             }
@@ -97,7 +111,6 @@ class CheckInViewModel: ObservableObject {
                     return CheckIn(date: timestamp.dateValue(), status: status)
                 }
 
-                // Update the matching pairing with fresh check-ins
                 Task { @MainActor in
                     if let index = self.pairings.firstIndex(where: { $0.checkInUsername == username }) {
                         self.pairings[index].checkIns = checkIns
@@ -154,12 +167,39 @@ class CheckInViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Story 14: Update custom reminder message
+    func updateReminderMessage(_ message: String) async {
+        guard let index = selectedPairingIndex else { return }
+        let pairingId = pairings[index].id
+        pairings[index].customReminderMessage = message
+        do {
+            try await db.collection("pairs")
+                .document(pairingId.uuidString)
+                .updateData(["customReminderMessage": message])
+        } catch {
+            errorMessage = "Failed to save message: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Story 13: Unpair a user
+    func unpairUser(_ pairing: Pairing) async {
+        do {
+            try await pairingService.removePairing(pairingId: pairing.id)
+            pairings.removeAll { $0.id == pairing.id }
+            if selectedPairingId == pairing.id {
+                selectedPairingId = pairings.first?.id
+            }
+            restartListeners()
+        } catch {
+            errorMessage = "Failed to unpair: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Perform Check-In (saves to Firebase)
     func performCheckIn(username: String) async {
         guard let index = selectedPairingIndex else { return }
         let today = Date()
 
-        // Update locally first for instant UI feedback
         pairings[index].checkIns.removeAll { checkIn in
             Calendar.current.isDate(checkIn.date, inSameDayAs: today) && checkIn.status == .pending
         }
@@ -168,7 +208,6 @@ class CheckInViewModel: ObservableObject {
             at: 0
         )
 
-        // Save to Firebase — listener will update checker automatically
         do {
             let data: [String: Any] = [
                 "username": username,

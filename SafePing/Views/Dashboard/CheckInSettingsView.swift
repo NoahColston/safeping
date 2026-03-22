@@ -2,6 +2,8 @@ import SwiftUI
 
 struct CheckInSettingsView: View {
     @ObservedObject var viewModel: CheckInViewModel
+    @State private var draftMessage: String = ""
+    @State private var messageSaved: Bool = false
 
     private let dayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
 
@@ -93,12 +95,54 @@ struct CheckInSettingsView: View {
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
+
+            // Story 14: Checker sets a custom reminder message for the check-in user
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Reminder Message")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.safePingTextMuted)
+                    .textCase(.uppercase)
+                    .tracking(0.4)
+
+                TextField("e.g. Hey, time to check in!", text: $draftMessage)
+                    .font(.system(size: 14))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color.safePingBg)
+                    .cornerRadius(10)
+
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        Task {
+                            await viewModel.updateReminderMessage(draftMessage)
+                            withAnimation { messageSaved = true }
+                            try? await Task.sleep(nanoseconds: 1_500_000_000)
+                            withAnimation { messageSaved = false }
+                        }
+                    }) {
+                        Text(messageSaved ? "Saved!" : "Save Message")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(messageSaved ? .safePingGreenEnd : .white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(messageSaved ? Color.safePingSuccessBg : Color.safePingDark)
+                            .cornerRadius(8)
+                    }
+                }
+            }
         }
         .padding(16)
         .background(Color.white)
         .cornerRadius(14)
         .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
         .animation(.easeInOut(duration: 0.25), value: viewModel.selectedPairing?.schedule.frequency)
+        .onAppear {
+            draftMessage = viewModel.selectedPairing?.customReminderMessage ?? ""
+        }
+        .onChange(of: viewModel.selectedPairingId) { _, _ in
+            draftMessage = viewModel.selectedPairing?.customReminderMessage ?? ""
+        }
     }
 }
 
