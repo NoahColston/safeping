@@ -6,7 +6,13 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if !authViewModel.isAuthenticated {
+            if authViewModel.isLoading && !authViewModel.isAuthenticated {
+                // Session restore in progress - show splash to avoid login flash
+                ZStack {
+                    Color.safePingBg.ignoresSafeArea()
+                    BrandHeader()
+                }
+            } else if !authViewModel.isAuthenticated {
                 NavigationStack {
                     LoginView()
                 }
