@@ -143,6 +143,11 @@ struct CheckInSettingsView: View {
         .onChange(of: viewModel.selectedPairingId) { _, _ in
             draftMessage = viewModel.selectedPairing?.customReminderMessage ?? ""
         }
+        .onChange(of: viewModel.selectedPairing?.customReminderMessage) { _, newValue in
+            if let newValue, draftMessage.isEmpty {
+                draftMessage = newValue
+            }
+        }
     }
 }
 

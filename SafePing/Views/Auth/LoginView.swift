@@ -43,14 +43,14 @@ struct LoginView: View {
                         label: "Username",
                         placeholder: "Enter your username",
                         text: $username
-                    )
+                    ).foregroundColor(.black)
 
                     SafePingTextField(
                         label: "Password",
                         placeholder: "Enter your password",
                         text: $password,
                         isSecure: true
-                    )
+                    ).foregroundColor(.black)
 
                     SafePingButton(title: "Sign In") {
                         authViewModel.login(username: username, password: password)

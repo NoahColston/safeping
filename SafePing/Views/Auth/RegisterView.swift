@@ -52,6 +52,7 @@ struct RegisterView: View {
                         errorMessage: usernameError
                     )
                     .onChange(of: username) { usernameError = nil }
+                    .foregroundColor(.black)
 
                     SafePingTextField(
                         label: "Password",
@@ -61,6 +62,7 @@ struct RegisterView: View {
                         errorMessage: passwordError
                     )
                     .onChange(of: password) { passwordError = nil }
+                    .foregroundColor(.black)
 
                     SafePingTextField(
                         label: "Confirm Password",
@@ -70,6 +72,7 @@ struct RegisterView: View {
                         errorMessage: confirmError
                     )
                     .onChange(of: confirmPassword) { confirmError = nil }
+                    .foregroundColor(.black)
 
                     SafePingButton(title: "Create Account") {
                         attemptRegistration()

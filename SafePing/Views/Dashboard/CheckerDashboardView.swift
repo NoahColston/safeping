@@ -17,15 +17,15 @@ struct CheckerDashboardView: View {
                         .font(.system(size: 20))
                         .foregroundColor(.safePingDark)
                 }
-
+                
                 Spacer()
-
+                
                 Text("SafePing")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.safePingDark)
-
+                
                 Spacer()
-
+                
                 Circle()
                     .fill(Color.safePingBorder)
                     .frame(width: 32, height: 32)
@@ -37,35 +37,43 @@ struct CheckerDashboardView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-
+            
             ScrollView {
                 VStack(spacing: 16) {
                     // Story 12: User tabs row + "+" add button
-                    HStack(spacing: 0) {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(checkInViewModel.pairings) { pairing in
-                                    UserTab(
-                                        name: pairing.checkInUsername,
-                                        isSelected: pairing.id == (checkInViewModel.selectedPairingId ?? checkInViewModel.pairings.first?.id)
-                                    ) {
-                                        checkInViewModel.selectPairing(pairing)
+                    if checkInViewModel.pairings.isEmpty {
+                        checkerEmptyState
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                    }
+                    else {
+                        HStack(spacing: 0) {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(checkInViewModel.pairings) { pairing in
+                                        UserTab(
+                                            name: pairing.checkInUsername,
+                                            isSelected: pairing.id == (checkInViewModel.selectedPairingId ?? checkInViewModel.pairings.first?.id)
+                                        ) {
+                                            checkInViewModel.selectPairing(pairing)
+                                        }
                                     }
                                 }
+                                .padding(.leading, 20)
+                                .padding(.trailing, 4)
                             }
-                            .padding(.leading, 20)
-                            .padding(.trailing, 4)
+                            
+                            
+                            Button(action: { showAddPairing = true }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 26))
+                                    .foregroundColor(.safePingDark)
+                            }
+                            .padding(.trailing, 20)
+                            .padding(.leading, 8)
                         }
-
-                        Button(action: { showAddPairing = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 26))
-                                .foregroundColor(.safePingDark)
-                        }
-                        .padding(.trailing, 20)
-                        .padding(.leading, 8)
                     }
-
+                    
                     if let pairing = checkInViewModel.selectedPairing {
                         // Status card with Story 13 unpair button
                         StatusCard(pairing: pairing) {
@@ -73,19 +81,19 @@ struct CheckerDashboardView: View {
                             showUnpairConfirm = true
                         }
                         .padding(.horizontal, 20)
-
+                        
                         CheckInCalendarView(pairing: pairing)
                             .padding(.horizontal, 20)
-
+                        
                         CheckInSettingsView(viewModel: checkInViewModel)
                             .padding(.horizontal, 20)
                     }
-
+                    
                     Spacer().frame(height: 20)
                 }
                 .padding(.top, 8)
             }
-
+            
             BottomTabBar()
         }
         .background(Color.safePingBg.ignoresSafeArea())
@@ -126,6 +134,40 @@ struct CheckerDashboardView: View {
             Text("They will no longer appear in your dashboard.")
         }
     }
+    private var checkerEmptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.badge.plus")
+                .font(.system(size: 40))
+                .foregroundColor(.safePingGreenEnd)
+
+            VStack(spacing: 6) {
+                Text("Add your first user")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.safePingDark)
+
+                Text("Pair with someone to start tracking their check-ins and reminders.")
+                    .font(.system(size: 14))
+                    .foregroundColor(.safePingTextMuted)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button(action: { showAddPairing = true }) {
+                Label("Add User", systemImage: "plus.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.safePingDark)
+                    .cornerRadius(12)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+    }
+    
 }
 
 // MARK: User Tab Pill

@@ -34,7 +34,6 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: authViewModel.isAuthenticated)
-        .animation(.easeInOut(duration: 0.3), value: authViewModel.needsOnboarding)
         .animation(.easeInOut(duration: 0.3), value: authViewModel.onboardingComplete)
         .animation(.easeInOut(duration: 0.3), value: authViewModel.pairingComplete)
     }
