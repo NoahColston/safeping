@@ -185,13 +185,14 @@ struct DayCell: View {
 
 #Preview {
     let calendar = Calendar.current
+    let pairingId = UUID()
     let pairing = Pairing(
         checkerUsername: "checker",
         checkInUsername: "John",
         checkIns: [
-            CheckIn(date: calendar.date(byAdding: .day, value: -1, to: Date())!, status: .checkedIn),
-            CheckIn(date: calendar.date(byAdding: .day, value: -2, to: Date())!, status: .checkedIn),
-            CheckIn(date: calendar.date(byAdding: .day, value: -3, to: Date())!, status: .missed),
+            CheckIn(pairingId: pairingId, date: calendar.date(byAdding: .day, value: -1, to: Date())!, status: .checkedIn),
+            CheckIn(pairingId: pairingId, date: calendar.date(byAdding: .day, value: -2, to: Date())!, status: .checkedIn),
+            CheckIn(pairingId: pairingId, date: calendar.date(byAdding: .day, value: -3, to: Date())!, status: .missed),
         ]
     )
     CheckInCalendarView(pairing: pairing)

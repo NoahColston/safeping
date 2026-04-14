@@ -71,7 +71,7 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     // MARK: - Schedule daily check-in reminder
     // Story 14: supports custom message and schedule time
     // Story 16: attaches action button category and stores username in userInfo
-    func scheduleCheckInReminder(message: String? = nil, hour: Int = 9, minute: Int = 0, username: String = "") {
+    func scheduleCheckInReminder(message: String? = nil, hour: Int = 9, minute: Int = 0, username: String = "", pairingId: String = "") {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["dailyCheckIn"])
 
         let content = UNMutableNotificationContent()
@@ -81,7 +81,7 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
             : "Your people are counting on you. Tap to check in now."
         content.sound = .default
         content.categoryIdentifier = NotificationService.checkInCategoryId
-        content.userInfo = ["username": username]
+        content.userInfo = ["username": username, "pairingId": pairingId]
 
         var dateComponents = DateComponents()
         dateComponents.hour = hour
@@ -102,9 +102,11 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         if response.actionIdentifier == NotificationService.checkInActionId {
-            let username = response.notification.request.content.userInfo["username"] as? String ?? ""
-            if !username.isEmpty {
-                Task { await saveCheckInFromNotification(username: username) }
+            let userInfo = response.notification.request.content.userInfo
+            let username = userInfo["username"] as? String ?? ""
+            let pairingId = userInfo["pairingId"] as? String ?? ""
+            if !username.isEmpty && !pairingId.isEmpty {
+                Task { await saveCheckInFromNotification(username: username, pairingId: pairingId) }
             }
         }
         completionHandler()
@@ -120,16 +122,17 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     }
 
     // MARK: - Save check-in to Firebase directly from the notification (no app open needed)
-    private func saveCheckInFromNotification(username: String) async {
+    private func saveCheckInFromNotification(username: String, pairingId: String) async {
         let db = Firestore.firestore()
         let today = Date()
         let data: [String: Any] = [
+            "pairingId": pairingId,
             "username": username,
             "date": Timestamp(date: today),
             "status": CheckInStatus.checkedIn.rawValue
         ]
         try? await db.collection("checkIns")
-            .document("\(username)_\(Int(today.timeIntervalSince1970))")
+            .document("\(pairingId)_\(Int(today.timeIntervalSince1970))")
             .setData(data)
     }
 

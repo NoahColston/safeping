@@ -42,4 +42,6 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentObject(AuthViewModel())
+        .environmentObject(NotificationService())
+        .environmentObject(LocationService())
 }

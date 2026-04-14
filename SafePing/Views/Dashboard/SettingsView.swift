@@ -67,54 +67,30 @@ struct SettingsView: View {
                 }
 
                 // MARK: - Notifications (check-in users only)
-                if authViewModel.currentUser?.role == .checkInUser {
+                if authViewModel.currentUser?.role == .checkInUser &&
+                   notificationService.permissionStatus == .denied {
                     SettingsSection(title: "Notifications") {
-                        SettingsRow(
-                            icon: "bell.fill",
-                            iconColor: .safePingGreenMid,
-                            label: "Daily Reminder"
-                        ) {
-                            Toggle("", isOn: Binding(
-                                get: { notificationService.isReminderEnabled },
-                                set: { enabled in
-                                    if enabled {
-                                        notificationService.isReminderEnabled = true
-                                        UserDefaults.standard.set(true, forKey: "reminderEnabled")
-                                    } else {
-                                        notificationService.disableReminders()
-                                    }
-                                }
-                            ))
-                            .tint(.safePingGreenMid)
-                            .labelsHidden()
-                        }
-
-                        // Show iOS Settings link if permission is denied
-                        if notificationService.permissionStatus == .denied {
-                            Divider().padding(.leading, 52)
-
-                            Button(action: {
-                                if let url = URL(string: UIApplication.openSettingsURLString) {
-                                    UIApplication.shared.open(url)
-                                }
-                            }) {
-                                SettingsRow(
-                                    icon: "exclamationmark.triangle.fill",
-                                    iconColor: .orange,
-                                    label: "Notifications Blocked"
-                                ) {
-                                    HStack(spacing: 4) {
-                                        Text("Open Settings")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(.safePingGreenEnd)
-                                        Image(systemName: "arrow.up.right")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.safePingGreenEnd)
-                                    }
+                        Button(action: {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            SettingsRow(
+                                icon: "exclamationmark.triangle.fill",
+                                iconColor: .orange,
+                                label: "Notifications Blocked"
+                            ) {
+                                HStack(spacing: 4) {
+                                    Text("Open Settings")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.safePingGreenEnd)
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.safePingGreenEnd)
                                 }
                             }
-                            .buttonStyle(.plain)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
 

@@ -63,7 +63,7 @@ class PairingService {
             "pairedAt": Timestamp(date: Date()),
             "isActive": true,
             "schedule": defaultSchedule.toFirestore(),
-            "currentStres": 0
+            "currentStreak": 0
         ]
         
         try await db.collection("pairs")
@@ -96,7 +96,9 @@ class PairingService {
             let scheduleData = data["schedule"] as? [String: Any]
             let schedule = scheduleData.map { CheckInSchedule.fromFirestore($0) } ?? CheckInSchedule()
             
+            let storedId = UUID(uuidString: doc.documentID) ?? UUID()
             return Pairing(
+                id: storedId,
                 checkerUsername: checkerUsername,
                 checkInUsername: checkInUsername,
                 schedule: schedule
