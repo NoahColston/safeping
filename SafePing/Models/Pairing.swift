@@ -73,6 +73,7 @@ struct Pairing: Identifiable, Codable {
     var schedule: CheckInSchedule
     var checkIns: [CheckIn]
     var customReminderMessage: String  // Story 14
+    var currentStreak: Int // streak tracker
 
     init(
         id: UUID = UUID(),
@@ -80,7 +81,8 @@ struct Pairing: Identifiable, Codable {
         checkInUsername: String,
         schedule: CheckInSchedule = CheckInSchedule(),
         checkIns: [CheckIn] = [],
-        customReminderMessage: String = ""
+        customReminderMessage: String = "",
+        currentStreak: Int = 0
     ) {
         self.id = id
         self.checkerUsername = checkerUsername
@@ -88,28 +90,9 @@ struct Pairing: Identifiable, Codable {
         self.schedule = schedule
         self.checkIns = checkIns
         self.customReminderMessage = customReminderMessage
+        self.currentStreak = currentStreak
     }
 
-    var currentStreak: Int {
-        let calendar = Calendar.current
-        let sorted = checkIns
-            .filter { $0.status == .checkedIn }
-            .sorted { $0.date > $1.date }
-
-        var streak = 0
-        var expectedDate = calendar.startOfDay(for: Date())
-
-        for checkIn in sorted {
-            let checkInDay = calendar.startOfDay(for: checkIn.date)
-            if checkInDay == expectedDate {
-                streak += 1
-                expectedDate = calendar.date(byAdding: .day, value: -1, to: expectedDate)!
-            } else if checkInDay < expectedDate {
-                break
-            }
-        }
-        return streak
-    }
 
     func status(for date: Date) -> CheckInStatus? {
         let calendar = Calendar.current

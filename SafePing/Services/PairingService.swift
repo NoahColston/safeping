@@ -62,7 +62,8 @@ class PairingService {
             "checkInUsername": pairing.checkInUsername,
             "pairedAt": Timestamp(date: Date()),
             "isActive": true,
-            "schedule": defaultSchedule.toFirestore()
+            "schedule": defaultSchedule.toFirestore(),
+            "currentStres": 0
         ]
         
         try await db.collection("pairs")

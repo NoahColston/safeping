@@ -46,3 +46,6 @@ fastlane/test_output
 # Environment files
 *.env
 .env.local
+
+#User Data
+xcuserdata/

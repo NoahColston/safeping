@@ -1,6 +1,6 @@
 import Foundation
 import SwiftUI
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 
 @MainActor
 class CheckInViewModel: ObservableObject {
@@ -65,14 +65,16 @@ class CheckInViewModel: ObservableObject {
                 let scheduleData = data["schedule"] as? [String: Any]
                 let schedule = scheduleData.map { CheckInSchedule.fromFirestore($0)} ?? CheckInSchedule()
                 let checkIns = try await fetchCheckIns(for: checkInUsername)
-
+                let currentStreak = data["currentStreak"] as? Int ?? 0
+                
                 let pairing = Pairing(
                     id: storedId,
                     checkerUsername: checkerUsername,
                     checkInUsername: checkInUsername,
                     schedule: schedule,
                     checkIns: checkIns,
-                    customReminderMessage: customMsg
+                    customReminderMessage: customMsg,
+                    currentStreak: currentStreak
                 )
                 loadedPairings.append(pairing)
             }
@@ -80,6 +82,15 @@ class CheckInViewModel: ObservableObject {
             pairings = loadedPairings
             if selectedPairingId == nil || !pairings.contains(where: { $0.id == selectedPairingId }) {
                 selectedPairingId = pairings.first?.id
+            }
+            
+            // NOTE: This is a client-side implementation. It only fires when
+            // the check-in user opens the app. A Cloud Function could replace
+            // or supplement this for real-time missed day detection.
+            if role == .checkInUser {
+                for index in pairings.indices {
+                    await processMissedDays(at: index, username: username)
+                }
             }
 
             for pairing in pairings {
@@ -92,6 +103,90 @@ class CheckInViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+    
+    // MARK: - Process missed days on app foreground
+    
+    private func processMissedDays(at index: Int, username: String) async {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+ 
+        // Yesterday is the last day that could possibly have been missed.
+        // Today is excluded — the user still has time to check in.
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return }
+ 
+        let pairing = pairings[index]
+ 
+        // Determine the start of the window to check.
+        // If there are existing records, start the day after the most recent one.
+        // Otherwise, look back a maximum of 30 days.
+        let mostRecentRecordDate = pairing.checkIns
+            .map { calendar.startOfDay(for: $0.date) }
+            .max()
+ 
+        let lookbackStart = calendar.date(byAdding: .day, value: -30, to: today)!
+        let windowStart: Date
+        if let mostRecent = mostRecentRecordDate {
+            let dayAfterMostRecent = calendar.date(byAdding: .day, value: 1, to: mostRecent)!
+            // Use whichever is more recent — the day after the last record, or 30 days ago.
+            // This prevents reprocessing a large backlog if there's a long-ago check-in.
+            windowStart = max(dayAfterMostRecent, lookbackStart)
+        } else {
+            windowStart = lookbackStart
+        }
+ 
+        // Nothing to process if the window is empty
+        guard windowStart <= yesterday else { return }
+ 
+        // Collect all dates that already have a record so we can skip them efficiently
+        let recordedDays = Set(pairing.checkIns.map { calendar.startOfDay(for: $0.date) })
+ 
+        var missedDates: [Date] = []
+        var cursor = windowStart
+ 
+        while cursor <= yesterday {
+            let weekday = calendar.component(.weekday, from: cursor)
+ 
+            if pairing.schedule.isScheduled(weekday: weekday) && !recordedDays.contains(cursor) {
+                missedDates.append(cursor)
+            }
+ 
+            guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+            cursor = next
+        }
+ 
+        guard !missedDates.isEmpty else { return }
+ 
+        // Apply missed records locally for immediate UI update
+        let newCheckIns = missedDates.map { CheckIn(date: $0, status: .missed) }
+        pairings[index].checkIns.append(contentsOf: newCheckIns)
+ 
+        // The streak is broken — any missed scheduled day resets it to 0.
+        // The next successful check-in will start a fresh streak from 1.
+        pairings[index].currentStreak = 0
+ 
+        // Persist to Firestore
+        do {
+            for missedDate in missedDates {
+                let data: [String: Any] = [
+                    "username": username,
+                    "date": Timestamp(date: missedDate),
+                    "status": CheckInStatus.missed.rawValue
+                ]
+                // Document ID uses midnight timestamp to match the date granularity
+                // and avoid duplicates if this runs more than once for the same day
+                try await db.collection("checkIns")
+                    .document("\(username)_missed_\(Int(missedDate.timeIntervalSince1970))")
+                    .setData(data)
+            }
+ 
+            try await db.collection("pairs")
+                .document(pairing.id.uuidString)
+                .updateData(["currentStreak": 0])
+ 
+        } catch {
+            errorMessage = "Failed to record missed days: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - Live listener for a checkee's check-ins
@@ -226,6 +321,10 @@ class CheckInViewModel: ObservableObject {
             CheckIn(date: today, status: .checkedIn),
             at: 0
         )
+        
+        pairings[index].currentStreak += 1
+        let newStreak = pairings[index].currentStreak
+        let pairingId = pairings[index].id
 
         do {
             let data: [String: Any] = [
@@ -237,6 +336,10 @@ class CheckInViewModel: ObservableObject {
             try await db.collection("checkIns")
                 .document("\(username)_\(Int(today.timeIntervalSince1970))")
                 .setData(data)
+            
+            try await db.collection("pairs")
+                            .document(pairingId.uuidString)
+                            .updateData(["currentStreak": newStreak])
 
         } catch {
             errorMessage = "Failed to save check-in: \(error.localizedDescription)"
