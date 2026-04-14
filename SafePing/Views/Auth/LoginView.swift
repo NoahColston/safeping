@@ -52,7 +52,7 @@ struct LoginView: View {
                         isSecure: true
                     ).foregroundColor(.black)
 
-                    SafePingButton(title: "Sign In") {
+                    SafePingButton(title: "Sign In", isLoading: authViewModel.isLoading) {
                         authViewModel.login(username: username, password: password)
                     }
 

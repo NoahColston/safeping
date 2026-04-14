@@ -80,18 +80,28 @@ struct SafePingTextField: View {
 // MARK: - Primary button with green gradient
 struct SafePingButton: View {
     let title: String
+    var isLoading: Bool = false
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(SafePingGradient())
-                .cornerRadius(10)
-                .shadow(color: .safePingGreenEnd.opacity(0.25), radius: 6, y: 3)
+        Button(action: { if !isLoading { action() } }) {
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)  // fixed height so the button doesn't resize when spinner appears
+            .background(SafePingGradient())
+            .cornerRadius(10)
+            .shadow(color: .safePingGreenEnd.opacity(isLoading ? 0.1 : 0.25), radius: 6, y: 3)
+            .opacity(isLoading ? 0.8 : 1.0)
         }
+        .disabled(isLoading)
     }
 }

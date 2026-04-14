@@ -74,7 +74,7 @@ struct RegisterView: View {
                     .onChange(of: confirmPassword) { confirmError = nil }
                     .foregroundColor(.black)
 
-                    SafePingButton(title: "Create Account") {
+                    SafePingButton(title: "Create Account", isLoading: authViewModel.isLoading) {
                         attemptRegistration()
                     }
 

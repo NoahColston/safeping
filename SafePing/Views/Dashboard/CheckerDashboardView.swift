@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CheckerDashboardView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject var notificationService: NotificationService
     @StateObject private var checkInViewModel = CheckInViewModel()
 
     @State private var showAddPairing = false
