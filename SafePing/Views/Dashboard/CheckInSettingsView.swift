@@ -19,7 +19,10 @@ struct CheckInSettingsView: View {
                     DatePicker(
                         "",
                         selection: Binding(
-                            get: { viewModel.pairings[index].schedule.time },
+                            get: {
+                                guard index < viewModel.pairings.count else { return Date() }
+                                return viewModel.pairings[index].schedule.time
+                            },
                             set: { viewModel.updateScheduleTime($0) }
                         ),
                         displayedComponents: .hourAndMinute
@@ -41,7 +44,10 @@ struct CheckInSettingsView: View {
                             .tracking(0.4)
 
                         Picker("", selection: Binding(
-                            get: { viewModel.pairings[index].schedule.frequency },
+                            get: {
+                                guard index < viewModel.pairings.count else { return CheckInFrequency.daily }
+                                return viewModel.pairings[index].schedule.frequency
+                            },
                             set: { viewModel.updateScheduleFrequency($0) }
                         )) {
                             ForEach(CheckInFrequency.allCases, id: \.self) { freq in
