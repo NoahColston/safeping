@@ -41,6 +41,28 @@ struct CheckInSchedule: Codable {
         if frequency == .daily { return true }
         return activeDays.contains(weekday)
     }
+    
+    func toFirestore() -> [String: Any] {
+        [
+            "hour": hour,
+            "minute": minute,
+            "frequency": frequency.rawValue,
+            "activeDays": Array(activeDays).sorted()
+        ]
+    }
+     
+        
+    static func fromFirestore(_ data: [String: Any]) -> CheckInSchedule {
+        let hour = data["hour"] as? Int ?? 9
+        let minute = data["minute"] as? Int ?? 0
+        let frequencyRaw = data["frequency"] as? String ?? CheckInFrequency.daily.rawValue
+        let frequency = CheckInFrequency(rawValue: frequencyRaw) ?? .daily
+        let activeDaysArray = data["activeDays"] as? [Int] ?? Array(1...7)
+ 
+        let time = Calendar.current.date(from: DateComponents(hour: hour, minute: minute)) ?? Date()
+ 
+        return CheckInSchedule(time: time, frequency: frequency, activeDays: Set(activeDaysArray))
+    }
 }
 
 // MARK: - Pairing

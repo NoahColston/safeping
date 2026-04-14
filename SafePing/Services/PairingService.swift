@@ -48,10 +48,12 @@ class PairingService {
             .document(code)
             .updateData(["isUsed": true])
         
+        let defaultSchedule = CheckInSchedule()
         // Create the pair
         let pairing = Pairing(
             checkerUsername: checkerUsername,
-            checkInUsername: checkeeUsername
+            checkInUsername: checkeeUsername,
+            schedule: defaultSchedule
         )
         
         let pairingData: [String: Any] = [
@@ -59,7 +61,8 @@ class PairingService {
             "checkerUsername": pairing.checkerUsername,
             "checkInUsername": pairing.checkInUsername,
             "pairedAt": Timestamp(date: Date()),
-            "isActive": true
+            "isActive": true,
+            "schedule": defaultSchedule.toFirestore()
         ]
         
         try await db.collection("pairs")
@@ -75,7 +78,7 @@ class PairingService {
             .document(pairingId.uuidString)
             .delete()
     }
-
+    
     // MARK: - Fetch all pairings for a checker
     func fetchPairings(for checkerUsername: String) async throws -> [Pairing] {
         let snapshot = try await db.collection("pairs")
@@ -89,9 +92,13 @@ class PairingService {
                 let checkInUsername = data["checkInUsername"] as? String
             else { return nil }
             
+            let scheduleData = data["schedule"] as? [String: Any]
+            let schedule = scheduleData.map { CheckInSchedule.fromFirestore($0) } ?? CheckInSchedule()
+            
             return Pairing(
                 checkerUsername: checkerUsername,
-                checkInUsername: checkInUsername
+                checkInUsername: checkInUsername,
+                schedule: schedule
             )
         }
     }

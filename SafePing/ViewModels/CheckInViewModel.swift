@@ -62,12 +62,15 @@ class CheckInViewModel: ObservableObject {
                 // Use the stored Firestore doc ID as the pairing UUID so unpair/updates work
                 let storedId = UUID(uuidString: doc.documentID) ?? UUID()
                 let customMsg = data["customReminderMessage"] as? String ?? ""
+                let scheduleData = data["schedule"] as? [String: Any]
+                let schedule = scheduleData.map { CheckInSchedule.fromFirestore($0)} ?? CheckInSchedule()
                 let checkIns = try await fetchCheckIns(for: checkInUsername)
 
                 let pairing = Pairing(
                     id: storedId,
                     checkerUsername: checkerUsername,
                     checkInUsername: checkInUsername,
+                    schedule: schedule,
                     checkIns: checkIns,
                     customReminderMessage: customMsg
                 )
@@ -149,11 +152,15 @@ class CheckInViewModel: ObservableObject {
     func updateScheduleTime(_ time: Date) {
         guard let index = selectedPairingIndex else { return }
         pairings[index].schedule.time = time
+        let pairing = pairings[index]
+        Task { await saveSchedule(for: pairing.id, schedule: pairing.schedule) }
     }
 
     func updateScheduleFrequency(_ frequency: CheckInFrequency) {
         guard let index = selectedPairingIndex else { return }
         pairings[index].schedule.frequency = frequency
+        let pairing = pairings[index]
+        Task { await saveSchedule(for: pairing.id, schedule: pairing.schedule) }
     }
 
     func toggleScheduleDay(_ weekday: Int) {
@@ -164,6 +171,18 @@ class CheckInViewModel: ObservableObject {
             }
         } else {
             pairings[index].schedule.activeDays.insert(weekday)
+        }
+        let pairing = pairings[index]
+        Task { await saveSchedule(for: pairing.id, schedule: pairing.schedule) }
+    }
+    
+    private func saveSchedule(for pairingId: UUID, schedule: CheckInSchedule) async {
+        do {
+            try await db.collection("pairs")
+                .document(pairingId.uuidString)
+                .updateData(["schedule": schedule.toFirestore()])
+        } catch {
+            errorMessage = "Failed to save schedule: \(error.localizedDescription)"
         }
     }
 
