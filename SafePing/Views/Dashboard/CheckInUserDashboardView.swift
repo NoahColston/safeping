@@ -4,6 +4,7 @@ struct CheckInUserDashboardView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var checkInViewModel = CheckInViewModel()
     @EnvironmentObject var notificationService: NotificationService
+    @StateObject private var pairingViewModel = PairingViewModel()
 
     @State private var justCheckedIn = false
     @State private var showPairingCode = false
@@ -78,6 +79,9 @@ struct CheckInUserDashboardView: View {
                         // Calendar
                         CheckInCalendarView(pairing: pairing)
                             .padding(.horizontal, 20)
+                    } else {
+                        inlinePairingCodeState
+                            .padding(.horizontal, 20)
                     }
 
                     Spacer().frame(height: 20)
@@ -105,8 +109,17 @@ struct CheckInUserDashboardView: View {
                             minute: pairing.schedule.minute,
                             username: authViewModel.currentUser?.username ?? ""
                         )
+                    } else {
+                        await pairingViewModel.generateCode(for: user.username)
                     }
                 }
+            }
+        }
+        .onChange(of: checkInViewModel.selectedPairing?.id) { _, newValue in
+            guard newValue == nil, let username = authViewModel.currentUser?.username else { return }
+
+            Task {
+                await pairingViewModel.generateCode(for: username)
             }
         }
         // Story 12: Sheet to generate a new pairing code for another checker
@@ -114,6 +127,71 @@ struct CheckInUserDashboardView: View {
             GetPairingCodeSheet()
                 .environmentObject(authViewModel)
         }
+    }
+    
+    private var inlinePairingCodeState: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "hand.wave.fill")
+                .font(.system(size: 52))
+                .foregroundStyle(.teal)
+
+            VStack(spacing: 8) {
+                Text("Your pairing code")
+                    .font(.title2.bold())
+                    .foregroundColor(.safePingDark)
+
+                Text("Share this code with your checker so they can monitor your check-ins.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            if pairingViewModel.isLoading {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .padding(.vertical, 24)
+            } else {
+                Text(pairingViewModel.generatedCode)
+                    .font(.system(size: 52, weight: .bold, design: .monospaced))
+                    .tracking(8)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 20)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                ShareLink(item: "My Safe Ping pairing code is: \(pairingViewModel.generatedCode)") {
+                    Label("Share Code", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.teal)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+
+                Button("Generate a new code") {
+                    Task {
+                        await pairingViewModel.generateCode(
+                            for: authViewModel.currentUser?.username ?? ""
+                        )
+                    }
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+
+            if let error = pairingViewModel.errorMessage {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
     }
 
     // MARK: - Pinned check-in button (Story 15)
