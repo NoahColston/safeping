@@ -7,6 +7,7 @@ struct CheckerDashboardView: View {
     @State private var showAddPairing = false
     @State private var showUnpairConfirm = false
     @State private var pairingToRemove: Pairing?
+    @State private var selectedTab = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,63 +39,66 @@ struct CheckerDashboardView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Story 12: User tabs row + "+" add button
-                    if checkInViewModel.pairings.isEmpty {
-                        checkerEmptyState
-                            .padding(.horizontal, 20)
-                            .padding(.top, 8)
-                    }
-                    else {
-                        HStack(spacing: 0) {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(checkInViewModel.pairings) { pairing in
-                                        UserTab(
-                                            name: pairing.checkInUsername,
-                                            isSelected: pairing.id == (checkInViewModel.selectedPairingId ?? checkInViewModel.pairings.first?.id)
-                                        ) {
-                                            checkInViewModel.selectPairing(pairing)
+            if selectedTab == 3 {
+                SettingsView()
+            } else {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Story 12: User tabs row + "+" add button
+                        if checkInViewModel.pairings.isEmpty {
+                            checkerEmptyState
+                                .padding(.horizontal, 20)
+                                .padding(.top, 8)
+                        }
+                        else {
+                            HStack(spacing: 0) {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(checkInViewModel.pairings) { pairing in
+                                            UserTab(
+                                                name: pairing.checkInUsername,
+                                                isSelected: pairing.id == (checkInViewModel.selectedPairingId ?? checkInViewModel.pairings.first?.id)
+                                            ) {
+                                                checkInViewModel.selectPairing(pairing)
+                                            }
                                         }
                                     }
+                                    .padding(.leading, 20)
+                                    .padding(.trailing, 4)
                                 }
-                                .padding(.leading, 20)
-                                .padding(.trailing, 4)
+                                
+                                
+                                Button(action: { showAddPairing = true }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 26))
+                                        .foregroundColor(.safePingDark)
+                                }
+                                .padding(.trailing, 20)
+                                .padding(.leading, 8)
                             }
-                            
-                            
-                            Button(action: { showAddPairing = true }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 26))
-                                    .foregroundColor(.safePingDark)
+                        }
+                        
+                        if let pairing = checkInViewModel.selectedPairing {
+                            // Status card with Story 13 unpair button
+                            StatusCard(pairing: pairing) {
+                                pairingToRemove = pairing
+                                showUnpairConfirm = true
                             }
-                            .padding(.trailing, 20)
-                            .padding(.leading, 8)
-                        }
-                    }
-                    
-                    if let pairing = checkInViewModel.selectedPairing {
-                        // Status card with Story 13 unpair button
-                        StatusCard(pairing: pairing) {
-                            pairingToRemove = pairing
-                            showUnpairConfirm = true
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        CheckInCalendarView(pairing: pairing)
                             .padding(.horizontal, 20)
+                            
+                            CheckInCalendarView(pairing: pairing)
+                                .padding(.horizontal, 20)
+                            
+                            CheckInSettingsView(viewModel: checkInViewModel)
+                                .padding(.horizontal, 20)
+                        }
                         
-                        CheckInSettingsView(viewModel: checkInViewModel)
-                            .padding(.horizontal, 20)
+                        Spacer().frame(height: 20)
                     }
-                    
-                    Spacer().frame(height: 20)
+                    .padding(.top, 8)
                 }
-                .padding(.top, 8)
             }
-            
-            BottomTabBar()
+            BottomTabBar(selectedTab: $selectedTab)
         }
         .background(Color.safePingBg.ignoresSafeArea())
         .onAppear {
@@ -335,13 +339,13 @@ struct AddPairingSheet: View {
 
 // MARK: Bottom Tab Bar
 struct BottomTabBar: View {
-    @State private var selectedTab = 0
+    @Binding var selectedTab: Int
 
     var body: some View {
         HStack {
             TabBarItem(icon: "house.fill", isSelected: selectedTab == 0) { selectedTab = 0 }
             TabBarItem(icon: "person.2.fill", isSelected: selectedTab == 1) { selectedTab = 1 }
-            TabBarItem(icon: "arrow.counterclockwise", isSelected: selectedTab == 2) { selectedTab = 2 }
+            TabBarItem(icon: "map.fill", isSelected: selectedTab == 2) { selectedTab = 2 }
             TabBarItem(icon: "gearshape.fill", isSelected: selectedTab == 3) { selectedTab = 3 }
         }
         .padding(.horizontal, 32)
@@ -371,4 +375,5 @@ struct TabBarItem: View {
 #Preview {
     CheckerDashboardView()
         .environmentObject(AuthViewModel())
+        .environmentObject(NotificationService())
 }

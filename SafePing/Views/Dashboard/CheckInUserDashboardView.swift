@@ -8,6 +8,7 @@ struct CheckInUserDashboardView: View {
 
     @State private var justCheckedIn = false
     @State private var showPairingCode = false
+    @State private var selectedTab = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,49 +43,53 @@ struct CheckInUserDashboardView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
 
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Greeting
-                    VStack(spacing: 4) {
-                        Text("Hey, \(authViewModel.currentUser?.username ?? "there")!")
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                            .foregroundColor(.safePingDark)
-
+            if selectedTab == 3 {
+                SettingsView()
+            } else {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Greeting
+                        VStack(spacing: 4) {
+                            Text("Hey, \(authViewModel.currentUser?.username ?? "there")!")
+                                .font(.system(size: 26, weight: .bold, design: .rounded))
+                                .foregroundColor(.safePingDark)
+                            
+                            if let pairing = checkInViewModel.selectedPairing {
+                                Text("Paired with \(pairing.checkerUsername)")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.safePingTextMuted)
+                            }
+                        }
+                        .padding(.top, 8)
+                        
+                        // Status cards row
                         if let pairing = checkInViewModel.selectedPairing {
-                            Text("Paired with \(pairing.checkerUsername)")
-                                .font(.system(size: 14))
-                                .foregroundColor(.safePingTextMuted)
-                        }
-                    }
-                    .padding(.top, 8)
-
-                    // Status cards row
-                    if let pairing = checkInViewModel.selectedPairing {
-                        HStack(spacing: 12) {
-                            InfoCard(
-                                title: "Next Check-In",
-                                value: pairing.schedule.formattedTime,
-                                icon: "clock.fill",
-                                color: .safePingGreenMid
-                            )
-                            InfoCard(
-                                title: "Current Streak",
-                                value: "\(pairing.currentStreak) days",
-                                icon: "flame.fill",
-                                color: .orange
-                            )
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Calendar
-                        CheckInCalendarView(pairing: pairing)
+                            HStack(spacing: 12) {
+                                InfoCard(
+                                    title: "Next Check-In",
+                                    value: pairing.schedule.formattedTime,
+                                    icon: "clock.fill",
+                                    color: .safePingGreenMid
+                                )
+                                InfoCard(
+                                    title: "Current Streak",
+                                    value: "\(pairing.currentStreak) days",
+                                    icon: "flame.fill",
+                                    color: .orange
+                                )
+                            }
                             .padding(.horizontal, 20)
-                    } else {
-                        inlinePairingCodeState
-                            .padding(.horizontal, 20)
+                            
+                            // Calendar
+                            CheckInCalendarView(pairing: pairing)
+                                .padding(.horizontal, 20)
+                        } else {
+                            inlinePairingCodeState
+                                .padding(.horizontal, 20)
+                        }
+                        
+                        Spacer().frame(height: 20)
                     }
-
-                    Spacer().frame(height: 20)
                 }
             }
 
@@ -93,7 +98,7 @@ struct CheckInUserDashboardView: View {
                 pinnedCheckInButton(pairing: pairing)
             }
 
-            BottomTabBar()
+            BottomTabBar(selectedTab: $selectedTab)
         }
         .background(Color.safePingBg.ignoresSafeArea())
         .onAppear {
@@ -370,5 +375,7 @@ struct GetPairingCodeSheet: View {
     vm.currentUser = User(username: "Noah", password: "", role: .checkInUser)
     vm.isAuthenticated = true
     vm.onboardingComplete = true
-    return CheckInUserDashboardView().environmentObject(vm)
+    return CheckInUserDashboardView()
+        .environmentObject(vm)
+        .environmentObject(NotificationService())
 }

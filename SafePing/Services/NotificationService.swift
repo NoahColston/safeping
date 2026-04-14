@@ -5,8 +5,13 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
 
     static let checkInActionId   = "CHECK_IN_ACTION"
     static let checkInCategoryId = "CHECK_IN_CATEGORY"
+    
+    @Published var isReminderEnabled: Bool
+    @Published var permissionStatus: UNAuthorizationStatus = .notDetermined
+
 
     override init() {
+        isReminderEnabled = UserDefaults.standard.bool(forKey: "reminderEnabled")
         super.init()
         // Set delegate at init so action responses are captured even on cold launch
         UNUserNotificationCenter.current().delegate = self
@@ -32,11 +37,35 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     // MARK: - Request permission
     func requestPermission() async {
         do {
-            try await UNUserNotificationCenter.current()
+            let granted = try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound, .badge])
+            await MainActor.run {
+                isReminderEnabled = granted
+                UserDefaults.standard.set(granted, forKey: "reminderEnabled")
+                permissionStatus = granted ? .authorized : .denied
+            }
         } catch {
             print("Notification permission error: \(error)")
         }
+    }
+    // MARK: - Refresh permission status from system (call on settings appear)
+    func refreshPermissionStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        await MainActor.run {
+            permissionStatus = settings.authorizationStatus
+            // If the user revoked permission in iOS Settings, reflect that in our toggle
+            if settings.authorizationStatus == .denied {
+                isReminderEnabled = false
+                UserDefaults.standard.set(false, forKey: "reminderEnabled")
+            }
+        }
+    }
+ 
+    // MARK: - Disable reminders (called by settings toggle)
+    func disableReminders() {
+        cancelAllNotifications()
+        isReminderEnabled = false
+        UserDefaults.standard.set(false, forKey: "reminderEnabled")
     }
 
     // MARK: - Schedule daily check-in reminder
@@ -61,6 +90,9 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
         let request = UNNotificationRequest(identifier: "dailyCheckIn", content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
+        
+        isReminderEnabled = true
+                UserDefaults.standard.set(true, forKey: "reminderEnabled")
     }
 
     // MARK: - Story 16: Handle "Check In" action tapped from notification banner
