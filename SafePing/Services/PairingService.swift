@@ -43,6 +43,13 @@ class PairingService {
         
         let checkeeUsername = data["checkeeUsername"] as? String ?? ""
         
+        // Check for an existing active pairing between these two users
+            let existing = try await db.collection("pairs")
+                .whereField("checkerUsername", isEqualTo: checkerUsername)
+                .whereField("checkInUsername", isEqualTo: checkeeUsername)
+                .getDocuments()
+            guard existing.documents.isEmpty else { throw PairingError.alreadyPaired }
+        
         // Mark code as used
         try await db.collection("pairingCodes")
             .document(code)
@@ -111,12 +118,14 @@ enum PairingError: LocalizedError {
     case invalidCode
     case alreadyUsed
     case expired
+    case alreadyPaired
     
     var errorDescription: String? {
         switch self {
         case .invalidCode: return "That code doesn't exist. Double-check and try again."
         case .alreadyUsed: return "This code has already been used."
         case .expired:     return "This code has expired. Ask for a new one."
+        case .alreadyPaired:     return "You are already paired with that user."
         }
     }
 }
