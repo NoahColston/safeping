@@ -8,16 +8,22 @@ enum CheckInFrequency: String, Codable, CaseIterable {
     var displayName: String { rawValue }
 }
 
-struct CheckInSchedule: Codable {
+struct CheckInSchedule: Codable, Identifiable, Hashable {
+    let id: UUID
+    var message: String
     var time: Date
     var frequency: CheckInFrequency
     var activeDays: Set<Int>
 
     init(
+        id: UUID = UUID(),
+        message: String = "",
         time: Date = Calendar.current.date(from: DateComponents(hour: 9, minute: 0)) ?? Date(),
         frequency: CheckInFrequency = .daily,
         activeDays: Set<Int> = Set(1...7)
     ) {
+        self.id = id
+        self.message = message
         self.time = time
         self.frequency = frequency
         self.activeDays = activeDays
@@ -36,6 +42,10 @@ struct CheckInSchedule: Codable {
         formatter.timeStyle = .short
         return formatter.string(from: time)
     }
+    
+    var displayMessage: String {
+        message.isEmpty ? formattedTime : message
+    }
 
     func isScheduled(weekday: Int) -> Bool {
         if frequency == .daily { return true }
@@ -44,6 +54,8 @@ struct CheckInSchedule: Codable {
     
     func toFirestore() -> [String: Any] {
         [
+            "id": id.uuidString,
+            "message": message,
             "hour": hour,
             "minute": minute,
             "frequency": frequency.rawValue,
@@ -53,6 +65,8 @@ struct CheckInSchedule: Codable {
      
         
     static func fromFirestore(_ data: [String: Any]) -> CheckInSchedule {
+        let id = (data["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
+        let message = data["message"] as? String ?? ""
         let hour = data["hour"] as? Int ?? 9
         let minute = data["minute"] as? Int ?? 0
         let frequencyRaw = data["frequency"] as? String ?? CheckInFrequency.daily.rawValue
@@ -61,7 +75,7 @@ struct CheckInSchedule: Codable {
  
         let time = Calendar.current.date(from: DateComponents(hour: hour, minute: minute)) ?? Date()
  
-        return CheckInSchedule(time: time, frequency: frequency, activeDays: Set(activeDaysArray))
+        return CheckInSchedule(id: id, message: message, time: time, frequency: frequency, activeDays: Set(activeDaysArray))
     }
 }
 
@@ -70,33 +84,67 @@ struct Pairing: Identifiable, Codable {
     let id: UUID
     let checkerUsername: String
     let checkInUsername: String
-    var schedule: CheckInSchedule
+    var schedules: [CheckInSchedule]
     var checkIns: [CheckIn]
-    var customReminderMessage: String  // Story 14
     var currentStreak: Int // streak tracker
+    var pairedAt: Date
 
     init(
         id: UUID = UUID(),
         checkerUsername: String,
         checkInUsername: String,
-        schedule: CheckInSchedule = CheckInSchedule(),
+        schedules: [CheckInSchedule] = [CheckInSchedule()],
         checkIns: [CheckIn] = [],
-        customReminderMessage: String = "",
-        currentStreak: Int = 0
+        currentStreak: Int = 0,
+        pairedAt: Date = Date()
     ) {
         self.id = id
         self.checkerUsername = checkerUsername
         self.checkInUsername = checkInUsername
-        self.schedule = schedule
+        self.schedules = schedules
         self.checkIns = checkIns
-        self.customReminderMessage = customReminderMessage
         self.currentStreak = currentStreak
+        self.pairedAt = pairedAt
+    }
+    
+    // Schedules that apply on the given date, sorted by time.
+    func schedules(forDate date: Date) -> [CheckInSchedule] {
+        let weekday = Calendar.current.component(.weekday, from: date)
+        return schedules.filter { $0.isScheduled(weekday: weekday) }
+            .sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+    }
+
+    func checkIn(forDate date: Date, scheduleId: UUID) -> CheckIn? {
+        let calendar = Calendar.current
+        return checkIns.first { ci in
+            guard calendar.isDate(ci.date, inSameDayAs: date) else { return false }
+            return ci.scheduleId == scheduleId
+        }
     }
 
 
+    func status(for date: Date, scheduleId: UUID) -> CheckInStatus? {
+        checkIn(forDate: date, scheduleId: scheduleId)?.status
+    }
+    
     func status(for date: Date) -> CheckInStatus? {
         let calendar = Calendar.current
-        return checkIns.first { calendar.isDate($0.date, inSameDayAs: date) }?.status
+    
+        if calendar.startOfDay(for: date) < calendar.startOfDay(for: pairedAt) {
+            return nil
+        }
+        
+        let activeSchedules = schedules(forDate: date)
+        guard !activeSchedules.isEmpty else { return nil }
+
+        let statuses = activeSchedules.map { self.status(for: date, scheduleId: $0.id) }
+
+        if statuses.allSatisfy({ $0 == .checkedIn }) { return .checkedIn }
+
+        let isPast = calendar.startOfDay(for: date) < calendar.startOfDay(for: Date())
+        if isPast && statuses.contains(where: { $0 != .checkedIn }) { return .missed }
+
+        return .pending
     }
 
     var lastCheckIn: CheckIn? {
@@ -128,4 +176,39 @@ struct Pairing: Identifiable, Codable {
         formatter.dateFormat = "EEEE 'at' h:mma"
         return "Last checked in \(formatter.string(from: last.date))"
     }
+    
+    // Next upcoming scheduled time across all schedules.
+    var nextScheduledOccurrence: Date? {
+        let calendar = Calendar.current
+        let now = Date()
+        var candidates: [Date] = []
+        for schedule in schedules {
+            for offset in 0...7 {
+                guard let day = calendar.date(byAdding: .day, value: offset, to: now) else { continue }
+                let weekday = calendar.component(.weekday, from: day)
+                guard schedule.isScheduled(weekday: weekday) else { continue }
+                var components = calendar.dateComponents([.year, .month, .day], from: day)
+                components.hour = schedule.hour
+                components.minute = schedule.minute
+                guard let occurrence = calendar.date(from: components) else { continue }
+                if occurrence > now {
+                    candidates.append(occurrence)
+                    break
+                }
+            }
+        }
+        return candidates.min()
+    }
+
+    var nextScheduledFormatted: String {
+        guard let next = nextScheduledOccurrence else { return "—" }
+        let formatter = DateFormatter()
+        if Calendar.current.isDateInToday(next) {
+            formatter.dateFormat = "h:mm a"
+            return formatter.string(from: next)
+        }
+        formatter.dateFormat = "EEE h:mm a"
+        return formatter.string(from: next)
+    }
+    
 }

@@ -7,7 +7,7 @@ struct CheckInUserDashboardView: View {
     @EnvironmentObject var locationService: LocationService
     @StateObject private var pairingViewModel = PairingViewModel()
     
-    @State private var justCheckedIn = false
+    @State private var pulsingScheduleId: UUID?
     @State private var showPairingCode = false
     @State private var selectedTab = 0
     
@@ -86,7 +86,7 @@ struct CheckInUserDashboardView: View {
                                 HStack(spacing: 12) {
                                     InfoCard(
                                         title: "Next Check-In",
-                                        value: pairing.schedule.formattedTime,
+                                        value: pairing.nextScheduledFormatted,
                                         icon: "clock.fill",
                                         color: .safePingGreenMid
                                     )
@@ -99,7 +99,8 @@ struct CheckInUserDashboardView: View {
                                 }
                                 .padding(.horizontal, 20)
                                 
-                                
+                                todaysCheckInsCard(pairing: pairing)
+                                    .padding(.horizontal, 20)
                                 // Calendar
                                 CheckInCalendarView(pairing: pairing)
                                     .padding(.horizontal, 20)
@@ -115,13 +116,7 @@ struct CheckInUserDashboardView: View {
                         await checkInViewModel.loadData(for: user.username, role: .checkInUser)
                     }
                 }
-                
-                // Story 15: Check-in button pinned above the tab bar — always visible, no scrolling needed
-                if let pairing = checkInViewModel.selectedPairing {
-                    pinnedCheckInButton(pairing: pairing)
-                }
             }
-            
             BottomTabBar(selectedTab: $selectedTab)
         }
         .background(Color.safePingBg.ignoresSafeArea())
@@ -130,20 +125,21 @@ struct CheckInUserDashboardView: View {
                 Task {
                     await checkInViewModel.loadData(for: user.username, role: .checkInUser)
                     // Schedule reminder with checker's custom message (Story 14)
-                    if let pairing = checkInViewModel.selectedPairing {
-                        let msg = pairing.customReminderMessage.isEmpty ? nil : pairing.customReminderMessage
-                        notificationService.scheduleCheckInReminder(
-                            message: msg,
-                            hour: pairing.schedule.hour,
-                            minute: pairing.schedule.minute,
-                            username: authViewModel.currentUser?.username ?? "",
-                            pairingId: pairing.id.uuidString
-                        )
-                    } else {
+                    if checkInViewModel.pairings.isEmpty {
                         await pairingViewModel.generateCode(for: user.username)
                     }
                 }
             }
+        }
+        .onDisappear {
+                    checkInViewModel.stopListening()
+        }
+        .onChange(of: pairingsFingerprint) { _, _ in
+            guard let username = authViewModel.currentUser?.username else { return }
+            notificationService.scheduleAllReminders(
+                for: checkInViewModel.pairings,
+                username: username
+            )
         }
         .onChange(of: checkInViewModel.selectedPairing?.id) { _, newValue in
             guard newValue == nil, let username = authViewModel.currentUser?.username else { return }
@@ -174,7 +170,7 @@ struct CheckInUserDashboardView: View {
                 
                 Text("Share this code with your checker so they can monitor your check-ins.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.black)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -225,74 +221,88 @@ struct CheckInUserDashboardView: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
     }
+    /// Cheap fingerprint of the fields that should trigger a notification
+    /// reschedule when they change.
+    private var pairingsFingerprint: String {
+        checkInViewModel.pairings.map { pairing in
+            let scheduleParts = pairing.schedules.map {
+                "\($0.id.uuidString):\($0.hour):\($0.minute):\($0.frequency.rawValue):\($0.activeDays.sorted()):\($0.message)"
+            }.joined(separator: "|")
+            return "\(pairing.id.uuidString)#\(scheduleParts)"
+        }.joined(separator: "/")
+    }
 
-    // MARK: - Pinned check-in button (Story 15)
+    // MARK: - Today's check-ins card (per-slot buttons)
     @ViewBuilder
-    private func pinnedCheckInButton(pairing: Pairing) -> some View {
-        let todayStatus = pairing.status(for: Date())
-        let alreadyCheckedIn = todayStatus == .checkedIn
+    private func todaysCheckInsCard(pairing: Pairing) -> some View {
+        let today = Date()
+        let todaysSchedules = pairing.schedules(forDate: today)
 
-        VStack(spacing: 6) {
-            Button(action: {
-                if !alreadyCheckedIn {
-                    locationService.captureLocation()
-                    let coordinate = locationService.currentLocation?.coordinate
-                    Task {
-                        await checkInViewModel.performCheckIn(
-                            username: authViewModel.currentUser?.username ?? "",
-                            location: coordinate
-                        )
-                        notificationService.simulateCheckerAlert(
-                            checkeeName: authViewModel.currentUser?.username ?? "User"
-                        )
-                    }
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                        justCheckedIn = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        justCheckedIn = false
-                    }
-                }
-            }) {
-                HStack(spacing: 10) {
-                    Image(systemName: alreadyCheckedIn ? "checkmark.circle.fill" : "hand.wave.fill")
-                        .font(.system(size: 22))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Today")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(.safePingDark)
 
-                    // Label names the specific checker so it's clear which pairing
-                                        // the check-in applies to when multiple checkers are present
-                    Text(alreadyCheckedIn
-                         ? "Checked in with \(pairing.checkerUsername)!"
-                         : "Check In with \(pairing.checkerUsername)")
-                        .font(.system(size: 17, weight: .bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                Spacer()
+
+                if !todaysSchedules.isEmpty {
+                    let doneCount = todaysSchedules.filter {
+                        pairing.status(for: today, scheduleId: $0.id) == .checkedIn
+                    }.count
+                    Text("\(doneCount) of \(todaysSchedules.count) done")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.safePingTextMuted)
                 }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(
-                    alreadyCheckedIn
-                    ? LinearGradient(colors: [.safePingGreenEnd, .safePingGreenEnd], startPoint: .leading, endPoint: .trailing)
-                    : LinearGradient(colors: [.safePingGreenStart, .safePingGreenEnd], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
-                .cornerRadius(14)
-                .shadow(color: .safePingGreenEnd.opacity(0.3), radius: 8, y: 4)
-                .scaleEffect(justCheckedIn ? 1.03 : 1.0)
             }
-            .disabled(alreadyCheckedIn)
-            .opacity(alreadyCheckedIn ? 0.85 : 1.0)
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
 
-            if alreadyCheckedIn {
-                Text("Your checker has been notified")
-                    .font(.system(size: 13))
-                    .foregroundColor(.safePingGreenEnd)
-                    .padding(.bottom, 6)
+            if todaysSchedules.isEmpty {
+                Text("No check-ins scheduled for today.")
+                    .font(.system(size: 14))
+                    .foregroundColor(.safePingTextMuted)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 12)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(todaysSchedules) { schedule in
+                        TodaySlotRow(
+                            schedule: schedule,
+                            status: pairing.status(for: today, scheduleId: schedule.id),
+                            isPulsing: pulsingScheduleId == schedule.id,
+                            checkerUsername: pairing.checkerUsername,
+                            onCheckIn: { performCheckIn(scheduleId: schedule.id) }
+                        )
+                    }
+                }
             }
         }
-        .background(Color.safePingBg)
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+    }
+
+    private func performCheckIn(scheduleId: UUID) {
+        locationService.captureLocation()
+        let coordinate = locationService.currentLocation?.coordinate
+        Task {
+            await checkInViewModel.performCheckIn(
+                username: authViewModel.currentUser?.username ?? "",
+                scheduleId: scheduleId,
+                location: coordinate
+            )
+            notificationService.simulateCheckerAlert(
+                checkeeName: authViewModel.currentUser?.username ?? "User"
+            )
+        }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+            pulsingScheduleId = scheduleId
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            if pulsingScheduleId == scheduleId {
+                pulsingScheduleId = nil
+            }
+        }
     }
 }
 
@@ -324,12 +334,102 @@ struct InfoCard: View {
             Text(value)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.safePingDark)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color.white)
         .cornerRadius(14)
         .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+    }
+}
+
+// MARK: - Today slot row (one per scheduled check-in for the day)
+private struct TodaySlotRow: View {
+    let schedule: CheckInSchedule
+    let status: CheckInStatus?
+    let isPulsing: Bool
+    let checkerUsername: String
+    let onCheckIn: () -> Void
+
+    private var alreadyCheckedIn: Bool { status == .checkedIn }
+    private var wasMissed: Bool { status == .missed }
+
+    var body: some View {
+        Button(action: { if !alreadyCheckedIn { onCheckIn() } }) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(iconBackground)
+                        .frame(width: 38, height: 38)
+                    Image(systemName: iconName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(iconColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(schedule.displayMessage)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.safePingDark)
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundColor(.safePingTextMuted)
+                }
+
+                Spacer()
+
+                if !alreadyCheckedIn {
+                    Text("Check In")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            LinearGradient(
+                                colors: [.safePingGreenStart, .safePingGreenEnd],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(10)
+                }
+            }
+            .padding(12)
+            .background(rowBackground)
+            .cornerRadius(12)
+            .scaleEffect(isPulsing ? 1.03 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .disabled(alreadyCheckedIn)
+    }
+
+    private var subtitle: String {
+        if alreadyCheckedIn { return "Done · \(checkerUsername) notified" }
+        if wasMissed { return "Missed · \(schedule.formattedTime)" }
+        return schedule.formattedTime
+    }
+
+    private var iconName: String {
+        if alreadyCheckedIn { return "checkmark.circle.fill" }
+        if wasMissed { return "exclamationmark.circle.fill" }
+        return "clock.fill"
+    }
+
+    private var iconColor: Color {
+        if alreadyCheckedIn { return .safePingGreenEnd }
+        if wasMissed { return .safePingError }
+        return .safePingGreenMid
+    }
+
+    private var iconBackground: Color {
+        if alreadyCheckedIn { return Color.safePingSuccessBg }
+        if wasMissed { return Color.safePingErrorBg }
+        return Color.safePingGreenMid.opacity(0.12)
+    }
+
+    private var rowBackground: Color {
+        alreadyCheckedIn ? Color.safePingSuccessBg.opacity(0.6) : Color.safePingBg.opacity(0.5)
     }
 }
 
@@ -354,7 +454,7 @@ struct GetPairingCodeSheet: View {
 
                     Text("Share this code with someone else who should monitor your check-ins.")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.black)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
@@ -386,7 +486,7 @@ struct GetPairingCodeSheet: View {
                         }
                     }
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.black)
                 }
 
                 if let error = vm.errorMessage {

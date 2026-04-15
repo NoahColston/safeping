@@ -55,21 +55,23 @@ class PairingService {
             .document(code)
             .updateData(["isUsed": true])
         
-        let defaultSchedule = CheckInSchedule()
+        let defaultSchedules = [CheckInSchedule()]
+        let now = Date()
         // Create the pair
         let pairing = Pairing(
             checkerUsername: checkerUsername,
             checkInUsername: checkeeUsername,
-            schedule: defaultSchedule
+            schedules: defaultSchedules,
+            pairedAt: now
         )
         
         let pairingData: [String: Any] = [
             "id": pairing.id.uuidString,
             "checkerUsername": pairing.checkerUsername,
             "checkInUsername": pairing.checkInUsername,
-            "pairedAt": Timestamp(date: Date()),
+            "pairedAt": Timestamp(date: now),
             "isActive": true,
-            "schedule": defaultSchedule.toFirestore(),
+            "schedules": defaultSchedules.map { $0.toFirestore() },
             "currentStreak": 0
         ]
         
@@ -100,15 +102,23 @@ class PairingService {
                 let checkInUsername = data["checkInUsername"] as? String
             else { return nil }
             
-            let scheduleData = data["schedule"] as? [String: Any]
-            let schedule = scheduleData.map { CheckInSchedule.fromFirestore($0) } ?? CheckInSchedule()
+            let schedules: [CheckInSchedule]
+            if let arr = data["schedules"] as? [[String: Any]] {
+                schedules = arr.map { CheckInSchedule.fromFirestore($0) }
+            } else if let single = data["schedule"] as? [String: Any] {
+                schedules = [CheckInSchedule.fromFirestore(single)]
+            } else {
+                schedules = [CheckInSchedule()]
+            }
             
             let storedId = UUID(uuidString: doc.documentID) ?? UUID()
+            let pairedAt = (data["pairedAt"] as? Timestamp)?.dateValue() ?? Date()
             return Pairing(
                 id: storedId,
                 checkerUsername: checkerUsername,
                 checkInUsername: checkInUsername,
-                schedule: schedule
+                schedules: schedules,
+                pairedAt: pairedAt
             )
         }
     }

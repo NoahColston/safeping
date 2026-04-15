@@ -9,6 +9,7 @@ enum CheckInStatus: String, Codable {
 struct CheckIn: Identifiable, Codable {
     let id: UUID
     let pairingId: UUID
+    var scheduleId: UUID?
     let date: Date
     var status: CheckInStatus
     var latitude: Double?
@@ -17,6 +18,7 @@ struct CheckIn: Identifiable, Codable {
     init(
         id: UUID = UUID(),
         pairingId: UUID,
+        scheduleId: UUID? = nil,
         date: Date,
         status: CheckInStatus,
         latitude: Double? = nil,
@@ -24,6 +26,7 @@ struct CheckIn: Identifiable, Codable {
     ) {
         self.id = id
         self.pairingId = pairingId
+        self.scheduleId = scheduleId
         self.date = date
         self.status = status
         self.latitude = latitude

@@ -118,9 +118,9 @@ struct CheckInCalendarView: View {
 
         // Trailing days to fill the grid
         let remaining = (7 - (days.count % 7)) % 7
-        if remaining > 0, let lastDay = days.last {
+        if remaining > 0, let lastNonNil = days.compactMap({ $0 }).last {
             for offset in 1...remaining {
-                if let date = calendar.date(byAdding: .day, value: offset, to: lastDay ?? Date()) {
+                if let date = calendar.date(byAdding: .day, value: offset, to: lastNonNil) {
                     days.append(date)
                 }
             }
@@ -186,13 +186,19 @@ struct DayCell: View {
 #Preview {
     let calendar = Calendar.current
     let pairingId = UUID()
+    let scheduleId = UUID()
     let pairing = Pairing(
+        id: pairingId,
         checkerUsername: "checker",
         checkInUsername: "John",
+        schedules: [CheckInSchedule(id: scheduleId)],
         checkIns: [
-            CheckIn(pairingId: pairingId, date: calendar.date(byAdding: .day, value: -1, to: Date())!, status: .checkedIn),
-            CheckIn(pairingId: pairingId, date: calendar.date(byAdding: .day, value: -2, to: Date())!, status: .checkedIn),
-            CheckIn(pairingId: pairingId, date: calendar.date(byAdding: .day, value: -3, to: Date())!, status: .missed),
+            CheckIn(pairingId: pairingId, scheduleId: scheduleId,
+                    date: calendar.date(byAdding: .day, value: -1, to: Date())!, status: .checkedIn),
+            CheckIn(pairingId: pairingId, scheduleId: scheduleId,
+                    date: calendar.date(byAdding: .day, value: -2, to: Date())!, status: .checkedIn),
+            CheckIn(pairingId: pairingId, scheduleId: scheduleId,
+                    date: calendar.date(byAdding: .day, value: -3, to: Date())!, status: .missed),
         ]
     )
     CheckInCalendarView(pairing: pairing)

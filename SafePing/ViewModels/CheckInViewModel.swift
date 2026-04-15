@@ -34,14 +34,6 @@ class CheckInViewModel: ObservableObject {
         checkInListeners.removeAll()
     }
     
-    // MARK: - Restart listeners for current pairings
-    private func restartListeners() {
-        stopListening()
-        for pairing in pairings {
-            startCheckInListener(for: pairing)
-        }
-    }
-    
     // MARK: - Load data and start live listeners
     func loadData(for username: String, role: UserRole) async {
         isLoading = true
@@ -78,7 +70,10 @@ class CheckInViewModel: ObservableObject {
             errorMessage = error.localizedDescription
             return
         }
-        guard let documents = snapshot?.documents else { return }
+        guard let documents = snapshot?.documents else {
+            errorMessage = "Pairs snapshot was empty or missing."
+            return
+        }
         
         // Build the new pairings list, preserving any check-ins we've already
         // loaded so the calendar doesn't flicker between snapshots.
@@ -91,10 +86,17 @@ class CheckInViewModel: ObservableObject {
             else { continue }
             
             let storedId = UUID(uuidString: doc.documentID) ?? UUID()
-            let customMsg = data["customReminderMessage"] as? String ?? ""
-            let scheduleData = data["schedule"] as? [String: Any]
-            let schedule = scheduleData.map { CheckInSchedule.fromFirestore($0) } ?? CheckInSchedule()
             let currentStreak = data["currentStreak"] as? Int ?? 0
+            let pairedAt = (data["pairedAt"] as? Timestamp)?.dateValue() ?? Date()
+            
+            let schedules: [CheckInSchedule]
+            if let arr = data["schedules"] as? [[String: Any]] {
+                schedules = arr.map { CheckInSchedule.fromFirestore($0) }
+            } else if let single = data["schedule"] as? [String: Any] {
+                schedules = [CheckInSchedule.fromFirestore(single)]
+            } else {
+                schedules = [CheckInSchedule()]
+            }
             
             let existingCheckIns = pairings.first(where: { $0.id == storedId })?.checkIns ?? []
             
@@ -102,10 +104,10 @@ class CheckInViewModel: ObservableObject {
                 id: storedId,
                 checkerUsername: checkerUsername,
                 checkInUsername: checkInUsername,
-                schedule: schedule,
+                schedules: schedules,
                 checkIns: existingCheckIns,
-                customReminderMessage: customMsg,
-                currentStreak: currentStreak
+                currentStreak: currentStreak,
+                pairedAt: pairedAt
             ))
         }
         
@@ -125,9 +127,10 @@ class CheckInViewModel: ObservableObject {
             checkInListeners.removeValue(forKey: removedId)
         }
         
-        // Start listeners for newly added pairings
-        for addedId in newIds.subtracting(oldIds) {
-            if let pairing = pairings.first(where: { $0.id == addedId }) {
+        // Ensure every current pairing has an active listener.
+        // This also fixes reloads after stopListening().
+        for pairing in pairings {
+            if checkInListeners[pairing.id] == nil {
                 startCheckInListener(for: pairing)
             }
         }
@@ -141,90 +144,68 @@ class CheckInViewModel: ObservableObject {
     }
     
     // MARK: - Process missed days on app foreground
-    
     private func processMissedDays(at index: Int, username: String) async {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        
-        // Yesterday is the last day that could possibly have been missed.
-        // Today is excluded — the user still has time to check in.
         guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return }
-        
+
         let pairing = pairings[index]
         
-        // Determine the start of the window to check.
-        // If there are existing records, start the day after the most recent one.
-        // Otherwise, look back a maximum of 30 days.
-        let mostRecentRecordDate = pairing.checkIns
-            .map { calendar.startOfDay(for: $0.date) }
-            .max()
-        
-        let lookbackStart = calendar.date(byAdding: .day, value: -30, to: today)!
-        let windowStart: Date
-        if let mostRecent = mostRecentRecordDate {
-            let dayAfterMostRecent = calendar.date(byAdding: .day, value: 1, to: mostRecent)!
-            // Use whichever is more recent — the day after the last record, or 30 days ago.
-            // This prevents reprocessing a large backlog if there's a long-ago check-in.
-            windowStart = max(dayAfterMostRecent, lookbackStart)
-        } else {
-            windowStart = lookbackStart
-        }
-        
-        // Nothing to process if the window is empty
-        guard windowStart <= yesterday else { return }
-        
-        // Collect all dates that already have a record so we can skip them efficiently
-        let recordedDays = Set(pairing.checkIns.map { calendar.startOfDay(for: $0.date) })
-        
-        var missedDates: [Date] = []
-        var cursor = windowStart
-        
-        while cursor <= yesterday {
-            let weekday = calendar.component(.weekday, from: cursor)
-            
-            if pairing.schedule.isScheduled(weekday: weekday) && !recordedDays.contains(cursor) {
-                missedDates.append(cursor)
+        let pairedDay = calendar.startOfDay(for: pairing.pairedAt)
+        let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: today)!
+        let lookbackStart = max(thirtyDaysAgo, pairedDay)
+        var newCheckIns: [CheckIn] = []
+
+        // Walk each schedule independently so every slot gets its own
+        // missed record when no check-in exists for that (day, slot).
+        for schedule in pairing.schedules {
+            let recordedDays: Set<Date> = Set(
+                pairing.checkIns
+                    .filter { $0.scheduleId == schedule.id || $0.scheduleId == nil }
+                    .map { calendar.startOfDay(for: $0.date) }
+            )
+
+            var cursor = lookbackStart
+            while cursor <= yesterday {
+                let weekday = calendar.component(.weekday, from: cursor)
+                if schedule.isScheduled(weekday: weekday) && !recordedDays.contains(cursor) {
+                    newCheckIns.append(CheckIn(
+                        pairingId: pairing.id,
+                        scheduleId: schedule.id,
+                        date: cursor,
+                        status: .missed
+                    ))
+                }
+                guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+                cursor = next
             }
-            
-            guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
-            cursor = next
         }
-        
-        guard !missedDates.isEmpty else { return }
-        
-        // Apply missed records locally for immediate UI update
-        let newCheckIns = missedDates.map {
-            CheckIn(pairingId: pairing.id, date: $0, status: .missed)
-        }
+
+        guard !newCheckIns.isEmpty else { return }
+
         pairings[index].checkIns.append(contentsOf: newCheckIns)
-        
-        // The streak is broken — any missed scheduled day resets it to 0.
-        // The next successful check-in will start a fresh streak from 1.
         pairings[index].currentStreak = 0
-        
-        // Persist to Firestore
+
         do {
-            for checkIn in newCheckIns {
+            for ci in newCheckIns {
+                let dayKey = Int(ci.date.timeIntervalSince1970)
+                let scheduleKey = ci.scheduleId?.uuidString ?? "legacy"
+                let docId = "\(pairing.id.uuidString)_\(scheduleKey)_missed_\(dayKey)"
                 let data: [String: Any] = [
-                    "id": checkIn.id.uuidString,
+                    "id": ci.id.uuidString,
                     "pairingId": pairing.id.uuidString,
+                    "scheduleId": scheduleKey,
                     "username": username,
-                    "date": Timestamp(date: checkIn.date),
+                    "date": Timestamp(date: ci.date),
                     "status": CheckInStatus.missed.rawValue
                 ]
-                // Document ID uses midnight timestamp to match the date granularity
-                // and avoid duplicates if this runs more than once for the same day
-                try await db.collection("checkIns")
-                    .document("\(pairing.id.uuidString)_missed_\(Int(checkIn.date.timeIntervalSince1970))")
-                    .setData(data)
+                try await db.collection("checkIns").document(docId).setData(data)
             }
-            
             try await db.collection("pairs")
                 .document(pairing.id.uuidString)
                 .updateData(["currentStreak": 0])
-            
         } catch {
-            errorMessage = "Failed to record missed days: \(error.localizedDescription)"
+            errorMessage = "Failed to record missed days for pairing \(pairing.id.uuidString): \(error.localizedDescription)"
         }
     }
     
@@ -236,10 +217,26 @@ class CheckInViewModel: ObservableObject {
         let listener = db.collection("checkIns")
             .whereField("pairingId", isEqualTo: pairing.id.uuidString)
             .order(by: "date", descending: true)
-            .limit(to: 30)
+            .limit(to: 90)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
-                guard let documents = snapshot?.documents else { return }
+                
+                if let error = error {
+                    print("Check-in listener error for pairing \(pairing.id.uuidString): \(error.localizedDescription)")
+                    Task { @MainActor in
+                        self.errorMessage = "Failed to load check-ins for \(pairing.checkInUsername): \(error.localizedDescription)"
+                    }
+                    return
+                }
+                guard let documents = snapshot?.documents else {
+                    print("No snapshot returned for pairing:", pairing.id.uuidString)
+                    Task { @MainActor in
+                        self.errorMessage = "No snapshot returned for \(pairing.checkInUsername)."
+                    }
+                    return
+                }
+                
+                print("Received \(documents.count) check-in docs for pairing \(pairing.id.uuidString)")
                 
                 let checkIns = documents.compactMap { doc -> CheckIn? in
                     let data = doc.data()
@@ -250,10 +247,14 @@ class CheckInViewModel: ObservableObject {
                         let statusRaw = data["status"] as? String,
                         let status = CheckInStatus(rawValue: statusRaw)
                     else { return nil }
+                    
                     let id = (data["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
+                    let scheduleId = (data["scheduleId"] as? String).flatMap(UUID.init(uuidString:))
+                    
                     return CheckIn(
                         id: id,
                         pairingId: pairingId,
+                        scheduleId: scheduleId,
                         date: timestamp.dateValue(),
                         status: status,
                         latitude: data["latitude"] as? Double,
@@ -261,98 +262,106 @@ class CheckInViewModel: ObservableObject {
                     )
                 }
                 
+                print("Decoded \(checkIns.count) check-ins for pairing \(pairing.id.uuidString)")
+                
                 Task { @MainActor in
-                    if let index = self.pairings.firstIndex(where: { $0.id == pairing.id }) {
-                        self.pairings[index].checkIns = checkIns
+                    if checkIns.count != documents.count {
+                        self.errorMessage = "Loaded \(checkIns.count) of \(documents.count) check-ins for \(pairing.checkInUsername). Some documents may be malformed."
+                    } else {
+                        self.errorMessage = nil
                     }
+
+                    guard let index = self.pairings.firstIndex(where: { $0.id == pairing.id }) else { return }
+
+                    var updatedPairings = self.pairings
+                    updatedPairings[index].checkIns = checkIns
+                    self.pairings = updatedPairings
                 }
             }
         
         checkInListeners[pairing.id] = listener
     }
     
-    // MARK: - Fetch check-ins once
-    private func fetchCheckIns(for pairingId: UUID) async throws -> [CheckIn] {
-        let snapshot = try await db.collection("checkIns")
-            .whereField("pairingId", isEqualTo: pairingId.uuidString)
-            .order(by: "date", descending: true)
-            .limit(to: 30)
-            .getDocuments()
-        
-        return snapshot.documents.compactMap { doc in
-            let data = doc.data()
-            guard
-                let pairingIdString = data["pairingId"] as? String,
-                let pairingId = UUID(uuidString: pairingIdString),
-                let timestamp = data["date"] as? Timestamp,
-                let statusRaw = data["status"] as? String,
-                let status = CheckInStatus(rawValue: statusRaw)
-            else { return nil }
-            let id = (data["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
-            return CheckIn(
-                id: id,
-                pairingId: pairingId,
-                date: timestamp.dateValue(),
-                status: status,
-                latitude: data["latitude"] as? Double,
-                longitude: data["longitude"] as? Double
-            )
-        }
-    }
+    // --- Scheuling methods --
+    
+    
     // MARK: - Select Pairing
     func selectPairing(_ pairing: Pairing) {
         selectedPairingId = pairing.id
     }
     
-    // MARK: - Update Schedule
-    func updateScheduleTime(_ time: Date) {
-        guard let index = selectedPairingIndex else { return }
-        pairings[index].schedule.time = time
+    // MARK: - Schedule CRUD
+
+    /// Add a new default schedule to the selected pairing.
+    func addSchedule(to pairingId: UUID? = nil) {
+        let targetId = pairingId ?? selectedPairingId
+        guard let id = targetId,
+              let index = pairings.firstIndex(where: { $0.id == id }) else { return }
+        pairings[index].schedules.append(CheckInSchedule())
         let pairing = pairings[index]
-        Task { await saveSchedule(for: pairing.id, schedule: pairing.schedule) }
+        Task { await saveSchedules(for: pairing.id, schedules: pairing.schedules) }
     }
-    
-    func updateScheduleFrequency(_ frequency: CheckInFrequency) {
-        guard let index = selectedPairingIndex else { return }
-        pairings[index].schedule.frequency = frequency
+
+    func removeSchedule(_ scheduleId: UUID, from pairingId: UUID? = nil) {
+        let targetId = pairingId ?? selectedPairingId
+        guard let id = targetId,
+              let index = pairings.firstIndex(where: { $0.id == id }) else { return }
+        guard pairings[index].schedules.count > 1 else { return }
+        pairings[index].schedules.removeAll { $0.id == scheduleId }
         let pairing = pairings[index]
-        Task { await saveSchedule(for: pairing.id, schedule: pairing.schedule) }
+        Task { await saveSchedules(for: pairing.id, schedules: pairing.schedules) }
     }
-    
-    func toggleScheduleDay(_ weekday: Int) {
-        guard let index = selectedPairingIndex else { return }
-        if pairings[index].schedule.activeDays.contains(weekday) {
-            if pairings[index].schedule.activeDays.count > 1 {
-                pairings[index].schedule.activeDays.remove(weekday)
+
+    func updateScheduleTime(_ time: Date, scheduleId: UUID, in pairingId: UUID? = nil) {
+        mutateSchedule(scheduleId, in: pairingId) { $0.time = time }
+    }
+
+    func updateScheduleFrequency(_ frequency: CheckInFrequency, scheduleId: UUID, in pairingId: UUID? = nil) {
+        mutateSchedule(scheduleId, in: pairingId) { $0.frequency = frequency }
+    }
+
+    func updateScheduleMessage(_ message: String, scheduleId: UUID, in pairingId: UUID? = nil) {
+        mutateSchedule(scheduleId, in: pairingId) { $0.message = message }
+    }
+
+    func toggleScheduleDay(_ weekday: Int, scheduleId: UUID, in pairingId: UUID? = nil) {
+        mutateSchedule(scheduleId, in: pairingId) { schedule in
+            if schedule.activeDays.contains(weekday) {
+                if schedule.activeDays.count > 1 {
+                    schedule.activeDays.remove(weekday)
+                }
+            } else {
+                schedule.activeDays.insert(weekday)
             }
-        } else {
-            pairings[index].schedule.activeDays.insert(weekday)
         }
-        let pairing = pairings[index]
-        Task { await saveSchedule(for: pairing.id, schedule: pairing.schedule) }
     }
-    
-    private func saveSchedule(for pairingId: UUID, schedule: CheckInSchedule) async {
+
+    private func mutateSchedule(
+        _ scheduleId: UUID,
+        in pairingId: UUID?,
+        _ mutation: (inout CheckInSchedule) -> Void
+    ) {
+        let targetId = pairingId ?? selectedPairingId
+        guard let id = targetId,
+              let pairingIndex = pairings.firstIndex(where: { $0.id == id }),
+              let scheduleIndex = pairings[pairingIndex].schedules.firstIndex(where: { $0.id == scheduleId })
+        else { return }
+        mutation(&pairings[pairingIndex].schedules[scheduleIndex])
+        let pairing = pairings[pairingIndex]
+        Task { await saveSchedules(for: pairing.id, schedules: pairing.schedules) }
+    }
+
+    private func saveSchedules(for pairingId: UUID, schedules: [CheckInSchedule]) async {
         do {
             try await db.collection("pairs")
                 .document(pairingId.uuidString)
-                .updateData(["schedule": schedule.toFirestore()])
+                .updateData([
+                    "schedules": schedules.map { $0.toFirestore() },
+                    // Remove legacy single-schedule field so we never read stale data
+                    "schedule": FieldValue.delete()
+                ])
         } catch {
             errorMessage = "Failed to save schedule: \(error.localizedDescription)"
-        }
-    }
-    
-    // MARK: - Story 14: Update custom reminder message
-    func updateReminderMessage(_ message: String) async {
-        guard let index = selectedPairingIndex else { return }
-        let pairingId = pairings[index].id
-        pairings[index].customReminderMessage = message
-        do {
-            try await db.collection("pairs")
-                .document(pairingId.uuidString)
-                .updateData(["customReminderMessage": message])
-        } catch {
-            errorMessage = "Failed to save message: \(error.localizedDescription)"
         }
     }
     
@@ -361,6 +370,8 @@ class CheckInViewModel: ObservableObject {
         do {
             try await pairingService.removePairing(pairingId: pairing.id)
             pairings.removeAll { $0.id == pairing.id }
+            checkInListeners[pairing.id]?.remove()
+            checkInListeners.removeValue(forKey: pairing.id)
             if selectedPairingId == pairing.id {
                 selectedPairingId = pairings.first?.id
             }
@@ -370,50 +381,60 @@ class CheckInViewModel: ObservableObject {
     }
     
     // MARK: - Perform Check-In (saves to Firebase)
-    func performCheckIn(username: String, location: CLLocationCoordinate2D? = nil) async {
+    func performCheckIn(
+        username: String,
+        scheduleId: UUID,
+        location: CLLocationCoordinate2D? = nil
+    ) async {
         guard let index = selectedPairingIndex else { return }
         let today = Date()
         let pairingId = pairings[index].id
-        
-        pairings[index].checkIns.removeAll { (checkIn: CheckIn) -> Bool in
-            Calendar.current.isDate(checkIn.date, inSameDayAs: today) && checkIn.status == .pending
+
+        // Remove any pending/missed placeholder for this slot today
+        pairings[index].checkIns.removeAll { ci in
+            Calendar.current.isDate(ci.date, inSameDayAs: today)
+                && (ci.scheduleId == scheduleId || ci.scheduleId == nil)
+                && ci.status != .checkedIn
         }
         let newCheckIn = CheckIn(
             pairingId: pairingId,
+            scheduleId: scheduleId,
             date: today,
             status: .checkedIn,
             latitude: location?.latitude,
             longitude: location?.longitude
         )
         pairings[index].checkIns.insert(newCheckIn, at: 0)
-        
+
         pairings[index].currentStreak += 1
         let newStreak = pairings[index].currentStreak
+
         do {
+            // Doc ID bucketed by (pairing, schedule, day) — repeated taps
+            // on the same slot overwrite rather than duplicate.
+            let dayKey = Int(Calendar.current.startOfDay(for: today).timeIntervalSince1970)
+            let docId = "\(pairingId.uuidString)_\(scheduleId.uuidString)_\(dayKey)"
+
             var data: [String: Any] = [
                 "id": newCheckIn.id.uuidString,
                 "pairingId": pairingId.uuidString,
+                "scheduleId": scheduleId.uuidString,
                 "username": username,
                 "date": Timestamp(date: today),
                 "status": CheckInStatus.checkedIn.rawValue
             ]
-            
-            // attach location if available
+
             if let location {
                 data["latitude"] = location.latitude
                 data["longitude"] = location.longitude
             }
-            
-            try await db.collection("checkIns")
-                .document("\(pairingId.uuidString)_\(Int(today.timeIntervalSince1970))")
-                .setData(data)
-            
+
+            try await db.collection("checkIns").document(docId).setData(data)
             try await db.collection("pairs")
                 .document(pairingId.uuidString)
                 .updateData(["currentStreak": newStreak])
-            
         } catch {
-            errorMessage = "Failed to save check-in: \(error.localizedDescription)"
+            errorMessage = "Failed to save check-in for pairing \(pairingId.uuidString): \(error.localizedDescription)"
         }
     }
 }

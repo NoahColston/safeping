@@ -40,6 +40,15 @@ struct CheckerDashboardView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             
+            if let error = checkInViewModel.errorMessage {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+            }
+            
             if selectedTab == 3 {
                 SettingsView()
             } else {
