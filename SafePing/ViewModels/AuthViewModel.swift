@@ -14,7 +14,8 @@ class AuthViewModel: ObservableObject {
 
     private let db = Firestore.firestore()
     private let usersCollection = "users"
-
+    private var pairsListener: ListenerRegistration?
+    
     init() {
         Task {
             await restoreSession()
@@ -46,6 +47,7 @@ class AuthViewModel: ObservableObject {
                 isAuthenticated = true
                 onboardingComplete = UserDefaults.standard.bool(forKey: "onboardingComplete_\(savedUsername)")
                 loadPairingState()
+                startPairsListener()
             } else {
                 // Account no longer exists in Firebase - clear stale session
                 UserDefaults.standard.removeObject(forKey: "currentUsername")
@@ -106,6 +108,7 @@ class AuthViewModel: ObservableObject {
                         UserDefaults.standard.bool(forKey: "onboardingComplete_\(username)")
                     UserDefaults.standard.set(username, forKey: "currentUsername")
                     loadPairingState()
+                    startPairsListener()
                 } else {
                     errorMessage = "Invalid username or password."
                 }
@@ -119,15 +122,43 @@ class AuthViewModel: ObservableObject {
     // MARK: - Pairing
     func completePairing() {
         pairingComplete = true
-        UserDefaults.standard.set(
-            true,
-            forKey: "pairingComplete_\(currentUser?.id.uuidString ?? "")"
-        )
     }
 
     func loadPairingState() {
-        let key = "pairingComplete_\(currentUser?.id.uuidString ?? "")"
-        pairingComplete = UserDefaults.standard.bool(forKey: key)
+        guard let username = currentUser?.username else {
+            pairingComplete = false
+            return
+        }
+        pairingComplete = UserDefaults.standard.bool(forKey: "pairingComplete_\(username)")
+    }
+    
+    private func startPairsListener() {
+        pairsListener?.remove()
+        pairsListener = nil
+
+        guard let user = currentUser, let role = user.role else { return }
+        let field = role == .checker ? "checkerUsername" : "checkInUsername"
+
+        pairsListener = db.collection("pairs")
+            .whereField(field, isEqualTo: user.username)
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self = self else { return }
+                let hasPairs = !(snapshot?.documents.isEmpty ?? true)
+                Task { @MainActor in
+                    self.pairingComplete = hasPairs
+                    // Cache so the next cold launch can show the right screen
+                    // immediately, before the listener's first snapshot arrives.
+                    UserDefaults.standard.set(
+                        hasPairs,
+                        forKey: "pairingComplete_\(user.username)"
+                    )
+                }
+            }
+    }
+
+    private func stopPairsListener() {
+        pairsListener?.remove()
+        pairsListener = nil
     }
 
     // MARK: - Register (field validation is synchronous; Firebase write is async)
@@ -164,6 +195,7 @@ class AuthViewModel: ObservableObject {
                 onboardingComplete = false
                 pairingComplete = false
                 UserDefaults.standard.set(trimmedUsername, forKey: "currentUsername")
+                startPairsListener()
             } catch {
                 errorMessage = "Registration failed. Please try again."
             }
@@ -190,6 +222,7 @@ class AuthViewModel: ObservableObject {
             onboardingComplete = true
             UserDefaults.standard.set(true, forKey: "onboardingComplete_\(user.username)")
         }
+        startPairsListener()
     }
 
     // MARK: - Complete Onboarding
@@ -202,6 +235,10 @@ class AuthViewModel: ObservableObject {
 
     // MARK: - Logout
     func logout() {
+        stopPairsListener()
+        if let username = currentUser?.username {
+                UserDefaults.standard.removeObject(forKey: "pairingComplete_\(username)")
+        }
         UserDefaults.standard.removeObject(forKey: "currentUsername")
         currentUser = nil
         isAuthenticated = false

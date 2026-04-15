@@ -12,7 +12,9 @@ class CheckInViewModel: ObservableObject {
     
     private let db = Firestore.firestore()
     private let pairingService = PairingService()
-    private var listeners: [ListenerRegistration] = []
+    private var pairsListener: ListenerRegistration?
+    private var checkInListeners: [UUID: ListenerRegistration] = [:]
+
     
     var selectedPairing: Pairing? {
         guard let id = selectedPairingId else { return pairings.first }
@@ -26,8 +28,10 @@ class CheckInViewModel: ObservableObject {
     
     // MARK: - Stop all listeners
     func stopListening() {
-        listeners.forEach { $0.remove() }
-        listeners.removeAll()
+        pairsListener?.remove()
+        pairsListener = nil
+        checkInListeners.values.forEach { $0.remove() }
+        checkInListeners.removeAll()
     }
     
     // MARK: - Restart listeners for current pairings
@@ -43,66 +47,97 @@ class CheckInViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         stopListening()
-        
+
         let field = role == .checker ? "checkerUsername" : "checkInUsername"
-        
-        do {
-            let snapshot = try await db.collection("pairs")
-                .whereField(field, isEqualTo: username)
-                .getDocuments()
-            
-            var loadedPairings: [Pairing] = []
-            
-            for doc in snapshot.documents {
-                let data = doc.data()
-                guard
-                    let checkerUsername = data["checkerUsername"] as? String,
-                    let checkInUsername = data["checkInUsername"] as? String
-                else { continue }
-                
-                // Use the stored Firestore doc ID as the pairing UUID so unpair/updates work
-                let storedId = UUID(uuidString: doc.documentID) ?? UUID()
-                let customMsg = data["customReminderMessage"] as? String ?? ""
-                let scheduleData = data["schedule"] as? [String: Any]
-                let schedule = scheduleData.map { CheckInSchedule.fromFirestore($0)} ?? CheckInSchedule()
-                let checkIns = try await fetchCheckIns(for: storedId)
-                let currentStreak = data["currentStreak"] as? Int ?? 0
-                
-                let pairing = Pairing(
-                    id: storedId,
-                    checkerUsername: checkerUsername,
-                    checkInUsername: checkInUsername,
-                    schedule: schedule,
-                    checkIns: checkIns,
-                    customReminderMessage: customMsg,
-                    currentStreak: currentStreak
-                )
-                loadedPairings.append(pairing)
-            }
-            
-            pairings = loadedPairings
-            if selectedPairingId == nil || !pairings.contains(where: { $0.id == selectedPairingId }) {
-                selectedPairingId = pairings.first?.id
-            }
-            
-            for pairing in pairings {
-                startCheckInListener(for: pairing)
-            }
-            
-            // NOTE: This is a client-side implementation. It only fires when
-            // the check-in user opens the app.
-            if role == .checkInUser {
-                for index in pairings.indices {
-                    await processMissedDays(at: index, username: username)
+
+        pairsListener = db.collection("pairs")
+            .whereField(field, isEqualTo: username)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    await self.handlePairsSnapshot(
+                        snapshot,
+                        error: error,
+                        username: username,
+                        role: role
+                    )
                 }
             }
-            
-        } catch {
+    }
+
+    @MainActor
+    private func handlePairsSnapshot(
+        _ snapshot: QuerySnapshot?,
+        error: Error?,
+        username: String,
+        role: UserRole
+    ) async {
+        defer { isLoading = false }
+        
+        if let error = error {
             errorMessage = error.localizedDescription
-            pairings = []
+            return
+        }
+        guard let documents = snapshot?.documents else { return }
+        
+        // Build the new pairings list, preserving any check-ins we've already
+        // loaded so the calendar doesn't flicker between snapshots.
+        var loadedPairings: [Pairing] = []
+        for doc in documents {
+            let data = doc.data()
+            guard
+                let checkerUsername = data["checkerUsername"] as? String,
+                let checkInUsername = data["checkInUsername"] as? String
+            else { continue }
+            
+            let storedId = UUID(uuidString: doc.documentID) ?? UUID()
+            let customMsg = data["customReminderMessage"] as? String ?? ""
+            let scheduleData = data["schedule"] as? [String: Any]
+            let schedule = scheduleData.map { CheckInSchedule.fromFirestore($0) } ?? CheckInSchedule()
+            let currentStreak = data["currentStreak"] as? Int ?? 0
+            
+            let existingCheckIns = pairings.first(where: { $0.id == storedId })?.checkIns ?? []
+            
+            loadedPairings.append(Pairing(
+                id: storedId,
+                checkerUsername: checkerUsername,
+                checkInUsername: checkInUsername,
+                schedule: schedule,
+                checkIns: existingCheckIns,
+                customReminderMessage: customMsg,
+                currentStreak: currentStreak
+            ))
         }
         
-        isLoading = false
+        // Diff against current pairings to start/stop per-pairing check-in listeners
+        let oldIds = Set(pairings.map { $0.id })
+        let newIds = Set(loadedPairings.map { $0.id })
+        
+        pairings = loadedPairings
+        
+        if selectedPairingId == nil || !pairings.contains(where: { $0.id == selectedPairingId }) {
+            selectedPairingId = pairings.first?.id
+        }
+        
+        // Stop listeners for pairings that were removed
+        for removedId in oldIds.subtracting(newIds) {
+            checkInListeners[removedId]?.remove()
+            checkInListeners.removeValue(forKey: removedId)
+        }
+        
+        // Start listeners for newly added pairings
+        for addedId in newIds.subtracting(oldIds) {
+            if let pairing = pairings.first(where: { $0.id == addedId }) {
+                startCheckInListener(for: pairing)
+            }
+        }
+        
+        // Client-side missed-day backfill (still fires only when checkee opens app)
+        if role == .checkInUser {
+            for index in pairings.indices {
+                await processMissedDays(at: index, username: username)
+            }
+        }
     }
     
     // MARK: - Process missed days on app foreground
@@ -195,6 +230,9 @@ class CheckInViewModel: ObservableObject {
     
     // MARK: - Live listener for a checkee's check-ins
     private func startCheckInListener(for pairing: Pairing) {
+        // avoid duplicate listeners
+        checkInListeners[pairing.id]?.remove()
+        
         let listener = db.collection("checkIns")
             .whereField("pairingId", isEqualTo: pairing.id.uuidString)
             .order(by: "date", descending: true)
@@ -230,7 +268,7 @@ class CheckInViewModel: ObservableObject {
                 }
             }
         
-        listeners.append(listener)
+        checkInListeners[pairing.id] = listener
     }
     
     // MARK: - Fetch check-ins once
@@ -326,7 +364,6 @@ class CheckInViewModel: ObservableObject {
             if selectedPairingId == pairing.id {
                 selectedPairingId = pairings.first?.id
             }
-            restartListeners()
         } catch {
             errorMessage = "Failed to unpair: \(error.localizedDescription)"
         }

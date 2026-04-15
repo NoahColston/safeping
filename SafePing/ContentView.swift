@@ -22,15 +22,12 @@ struct ContentView: View {
                 NotificationPermissionView(notificationService: notificationService)
             } else if !authViewModel.pairingComplete {
                 PairingFlowView()
+            } else if authViewModel.currentUser?.role == .checker {
+                CheckerDashboardView()
+            } else if authViewModel.currentUser?.role == .checkInUser {
+                CheckInUserDashboardView()
             } else {
-                switch authViewModel.currentUser?.role {
-                case .checker:
-                    CheckerDashboardView()
-                case .checkInUser:
-                    CheckInUserDashboardView()
-                case .none:
-                    RoleSelectionView()
-                }
+                RoleSelectionView()
             }
         }
         .animation(.easeInOut(duration: 0.3), value: authViewModel.isAuthenticated)
@@ -43,5 +40,4 @@ struct ContentView: View {
     ContentView()
         .environmentObject(AuthViewModel())
         .environmentObject(NotificationService())
-        .environmentObject(LocationService())
 }

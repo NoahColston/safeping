@@ -6,6 +6,7 @@ struct SafePingApp: App {
     // Created here so the UNUserNotificationCenterDelegate is set before any notification response arrives
     @StateObject private var notificationService = NotificationService()
     @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var locationService = LocationService()
 
     init() {
         FirebaseApp.configure()
@@ -16,6 +17,7 @@ struct SafePingApp: App {
             ContentView()
                 .environmentObject(authViewModel)
                 .environmentObject(notificationService)
+                .environmentObject(locationService)
         }
     }
 }

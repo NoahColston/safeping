@@ -98,6 +98,11 @@ struct CheckerDashboardView: View {
                     }
                     .padding(.top, 8)
                 }
+                .refreshable {
+                    if let user = authViewModel.currentUser {
+                        await checkInViewModel.loadData(for: user.username, role: .checker)
+                    }
+                }
             }
             BottomTabBar(selectedTab: $selectedTab)
         }
@@ -122,6 +127,7 @@ struct CheckerDashboardView: View {
         }) {
             AddPairingSheet()
                 .environmentObject(authViewModel)
+                .environmentObject(notificationService)
         }
         // Story 13: Unpair confirmation
         .confirmationDialog(

@@ -6,11 +6,11 @@ struct CheckInUserDashboardView: View {
     @EnvironmentObject var notificationService: NotificationService
     @EnvironmentObject var locationService: LocationService
     @StateObject private var pairingViewModel = PairingViewModel()
-
+    
     @State private var justCheckedIn = false
     @State private var showPairingCode = false
     @State private var selectedTab = 0
-
+    
     var body: some View {
         VStack(spacing: 0) {
             // Top bar
@@ -20,15 +20,15 @@ struct CheckInUserDashboardView: View {
                         .font(.system(size: 20))
                         .foregroundColor(.safePingDark)
                 }
-
+                
                 Spacer()
-
+                
                 Text("SafePing")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.safePingDark)
-
+                
                 Spacer()
-
+                
                 // Story 12: tap profile icon to get a new pairing code
                 Button(action: { showPairingCode = true }) {
                     Circle()
@@ -43,7 +43,7 @@ struct CheckInUserDashboardView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-
+            
             if selectedTab == 3 {
                 SettingsView()
             } else {
@@ -99,20 +99,29 @@ struct CheckInUserDashboardView: View {
                                 }
                                 .padding(.horizontal, 20)
                                 
+                                
                                 // Calendar
                                 CheckInCalendarView(pairing: pairing)
                                     .padding(.horizontal, 20)
+                                
                             }
+                            Spacer().frame(height: 20)
                         }
-                        Spacer().frame(height: 20)
                     }
                 }
+                
+                .refreshable {
+                    if let user = authViewModel.currentUser {
+                        await checkInViewModel.loadData(for: user.username, role: .checkInUser)
+                    }
+                }
+                
                 // Story 15: Check-in button pinned above the tab bar — always visible, no scrolling needed
                 if let pairing = checkInViewModel.selectedPairing {
                     pinnedCheckInButton(pairing: pairing)
                 }
             }
-                
+            
             BottomTabBar(selectedTab: $selectedTab)
         }
         .background(Color.safePingBg.ignoresSafeArea())
@@ -138,7 +147,7 @@ struct CheckInUserDashboardView: View {
         }
         .onChange(of: checkInViewModel.selectedPairing?.id) { _, newValue in
             guard newValue == nil, let username = authViewModel.currentUser?.username else { return }
-
+            
             Task {
                 await pairingViewModel.generateCode(for: username)
             }
@@ -147,6 +156,8 @@ struct CheckInUserDashboardView: View {
         .sheet(isPresented: $showPairingCode) {
             GetPairingCodeSheet()
                 .environmentObject(authViewModel)
+                .environmentObject(notificationService)
+                .environmentObject(locationService)
         }
     }
     
@@ -160,7 +171,7 @@ struct CheckInUserDashboardView: View {
                 Text("Your pairing code")
                     .font(.title2.bold())
                     .foregroundColor(.safePingDark)
-
+                
                 Text("Share this code with your checker so they can monitor your check-ins.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
