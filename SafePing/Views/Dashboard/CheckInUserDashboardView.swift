@@ -446,7 +446,7 @@ struct GetPairingCodeSheet: View {
 
                 Image(systemName: "hand.wave.fill")
                     .font(.system(size: 52))
-                    .foregroundStyle(.teal)
+                    .foregroundStyle(.indigo)
 
                 VStack(spacing: 8) {
                     Text("Add another checker")
@@ -454,7 +454,7 @@ struct GetPairingCodeSheet: View {
 
                     Text("Share this code with someone else who should monitor your check-ins.")
                         .font(.subheadline)
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
@@ -474,7 +474,7 @@ struct GetPairingCodeSheet: View {
                         Label("Share Code", systemImage: "square.and.arrow.up")
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(.teal)
+                            .background(.indigo)
                             .foregroundStyle(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
@@ -486,7 +486,7 @@ struct GetPairingCodeSheet: View {
                         }
                     }
                     .font(.footnote)
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.secondary)
                 }
 
                 if let error = vm.errorMessage {
