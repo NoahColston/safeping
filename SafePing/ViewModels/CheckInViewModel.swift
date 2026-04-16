@@ -358,8 +358,6 @@ class CheckInViewModel: ObservableObject {
                 .document(pairingId.uuidString)
                 .updateData([
                     "schedules": schedules.map { $0.toFirestore() },
-                    // Remove legacy single-schedule field so we never read stale data
-                    "schedule": FieldValue.delete()
                 ])
         } catch {
             errorMessage = "Failed to save schedule: \(error.localizedDescription)"

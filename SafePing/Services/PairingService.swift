@@ -89,39 +89,7 @@ class PairingService {
             .delete()
     }
     
-    // MARK: - Fetch all pairings for a checker
-    func fetchPairings(for checkerUsername: String) async throws -> [Pairing] {
-        let snapshot = try await db.collection("pairs")
-            .whereField("checkerUsername", isEqualTo: checkerUsername)
-            .getDocuments()
-        
-        return snapshot.documents.compactMap { doc in
-            let data = doc.data()
-            guard
-                let checkerUsername = data["checkerUsername"] as? String,
-                let checkInUsername = data["checkInUsername"] as? String
-            else { return nil }
-            
-            let schedules: [CheckInSchedule]
-            if let arr = data["schedules"] as? [[String: Any]] {
-                schedules = arr.map { CheckInSchedule.fromFirestore($0) }
-            } else if let single = data["schedule"] as? [String: Any] {
-                schedules = [CheckInSchedule.fromFirestore(single)]
-            } else {
-                schedules = [CheckInSchedule()]
-            }
-            
-            let storedId = UUID(uuidString: doc.documentID) ?? UUID()
-            let pairedAt = (data["pairedAt"] as? Timestamp)?.dateValue() ?? Date()
-            return Pairing(
-                id: storedId,
-                checkerUsername: checkerUsername,
-                checkInUsername: checkInUsername,
-                schedules: schedules,
-                pairedAt: pairedAt
-            )
-        }
-    }
+
 }
 
 enum PairingError: LocalizedError {

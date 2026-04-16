@@ -64,12 +64,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         }
     }
     
-    // MARK: - Disable reminders (called by settings toggle)
-    func disableReminders() {
-        cancelAllCheckInReminders()
-        isReminderEnabled = false
-        UserDefaults.standard.set(false, forKey: "reminderEnabled")
-    }
     
     // MARK: - Schedule daily check-in reminder
     // Story 14: supports custom message and schedule time
@@ -176,6 +170,7 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         let docId = "\(pairingId)_\(scheduleKey)_\(dayKey)"
         
         var data: [String: Any] = [
+            "id": UUID().uuidString,
             "pairingId": pairingId,
             "username": username,
             "date": Timestamp(date: today),
@@ -201,17 +196,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         UNUserNotificationCenter.current().add(request)
     }
     
-    // MARK: - Simulate missed check-in alert
-    func simulateMissedCheckIn(checkeeName: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "⚠️ \(checkeeName) hasn't checked in"
-        content.body = "\(checkeeName) missed their check-in today. You may want to reach out."
-        content.sound = UNNotificationSound.defaultCritical
-        
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request)
-    }
     
     // MARK: - Cancel check-in reminders only (scoped by prefix)
     func cancelAllCheckInReminders() {
@@ -223,7 +207,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         let toCancel = pending
             .map(\.identifier)
             .filter { $0.hasPrefix(NotificationService.checkInRequestPrefix) }
-        + ["dailyCheckIn"] // clean up legacy identifier if still pending
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: toCancel)
     }
     

@@ -28,14 +28,6 @@ class AuthViewModel: ObservableObject {
         return user.role == nil
     }
 
-    /// True when the user has a role but onboarding isn't finished
-    var needsOnboarding: Bool {
-        guard isAuthenticated, let user = currentUser else { return false }
-        if user.role == nil { return true }
-        if !onboardingComplete { return true }
-        return false
-    }
-
     // MARK: - Session Restore
     func restoreSession() async {
         guard let savedUsername = UserDefaults.standard.string(forKey: "currentUsername") else { return }
@@ -137,6 +129,11 @@ class AuthViewModel: ObservableObject {
         pairsListener = nil
 
         guard let user = currentUser, let role = user.role else { return }
+
+        // If already paired, no need for a live listener
+        // CheckInViewModel handles live updates on the dashboard.
+        if pairingComplete { return }
+
         let field = role == .checker ? "checkerUsername" : "checkInUsername"
 
         pairsListener = db.collection("pairs")
@@ -146,12 +143,14 @@ class AuthViewModel: ObservableObject {
                 let hasPairs = !(snapshot?.documents.isEmpty ?? true)
                 Task { @MainActor in
                     self.pairingComplete = hasPairs
-                    // Cache so the next cold launch can show the right screen
-                    // immediately, before the listener's first snapshot arrives.
                     UserDefaults.standard.set(
                         hasPairs,
                         forKey: "pairingComplete_\(user.username)"
                     )
+                    // Once paired, CheckInViewModel takes over
+                    if hasPairs {
+                        self.stopPairsListener()
+                    }
                 }
             }
     }

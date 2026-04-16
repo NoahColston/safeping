@@ -124,7 +124,9 @@ struct SettingsView: View {
 
                 // MARK: - Danger Zone
                 SettingsSection(title: "Account Actions") {
-                    Button(action: { authViewModel.logout() }) {
+                    Button(action: {
+                        notificationService.cancelAllNotifications()
+                        authViewModel.logout() }) {
                         SettingsRow(
                             icon: "rectangle.portrait.and.arrow.right",
                             iconColor: .safePingError,
