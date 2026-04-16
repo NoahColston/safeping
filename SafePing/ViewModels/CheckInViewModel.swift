@@ -185,7 +185,7 @@ class CheckInViewModel: ObservableObject {
 
         pairings[index].checkIns.append(contentsOf: newCheckIns)
         let newStreak = recomputeStreak(for: pairings[index])
-        pairings[index].currentStreak = 0
+        pairings[index].currentStreak = newStreak
 
         do {
             for ci in newCheckIns {
@@ -218,7 +218,7 @@ class CheckInViewModel: ObservableObject {
         let listener = db.collection("checkIns")
             .whereField("pairingId", isEqualTo: pairing.id.uuidString)
             .order(by: "date", descending: true)
-            .limit(to: 90)
+            .limit(to: 365) // currently limits streak to 365 days
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
                 
@@ -276,6 +276,7 @@ class CheckInViewModel: ObservableObject {
 
                     var updatedPairings = self.pairings
                     updatedPairings[index].checkIns = checkIns
+                    updatedPairings[index].currentStreak = self.recomputeStreak(for: updatedPairings[index])
                     self.pairings = updatedPairings
                 }
             }
@@ -391,7 +392,7 @@ class CheckInViewModel: ObservableObject {
 
         var streak = 0
         var cursor = today
-        var isFirstDay = true
+        var isToday = true
 
         for _ in 0..<365 {
             if cursor < pairedDay { break }
@@ -401,7 +402,7 @@ class CheckInViewModel: ObservableObject {
                 // No obligations this day —> skip without counting or breaking.
                 guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
                 cursor = prev
-                isFirstDay = false
+                isToday = false
                 continue
             }
 
@@ -411,15 +412,18 @@ class CheckInViewModel: ObservableObject {
 
             if allCheckedIn {
                 streak += 1
-            } else if !isFirstDay {
-                // A prior scheduled day was incomplete -> streak ends here.
+            } else if !isToday {
+                // Any prior day with scheduled check-ins that is not fully complete
+                // ends the streak.
                 break
             }
-            // else: today with incomplete slots -> in progress, keep going.
+            // else:
+            // today has scheduled check-ins, but is not fully complete yet
+            // -> do not count it, and do not break the streak
 
             guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
             cursor = prev
-            isFirstDay = false
+            isToday = false
         }
 
         return streak
