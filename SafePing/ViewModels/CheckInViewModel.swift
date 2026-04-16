@@ -184,6 +184,7 @@ class CheckInViewModel: ObservableObject {
         guard !newCheckIns.isEmpty else { return }
 
         pairings[index].checkIns.append(contentsOf: newCheckIns)
+        let newStreak = recomputeStreak(for: pairings[index])
         pairings[index].currentStreak = 0
 
         do {
@@ -203,7 +204,7 @@ class CheckInViewModel: ObservableObject {
             }
             try await db.collection("pairs")
                 .document(pairing.id.uuidString)
-                .updateData(["currentStreak": 0])
+                .updateData(["currentStreak": newStreak])
         } catch {
             errorMessage = "Failed to record missed days for pairing \(pairing.id.uuidString): \(error.localizedDescription)"
         }
@@ -380,6 +381,52 @@ class CheckInViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Streak calculation
+    /// Walks backward from today counting consecutive scheduled days where
+    /// every slot was checked in. Days with no scheduled slots are skipped.
+    /// For the current day,if its slots aren't all done yet, we don't count it but also don't
+    /// dont treat it as a break, so an in-progress day does not reset the streak.
+    private func recomputeStreak(for pairing: Pairing) -> Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let pairedDay = calendar.startOfDay(for: pairing.pairedAt)
+
+        var streak = 0
+        var cursor = today
+        var isFirstDay = true
+
+        for _ in 0..<365 {
+            if cursor < pairedDay { break }
+
+            let activeSchedules = pairing.schedules(forDate: cursor)
+            if activeSchedules.isEmpty {
+                // No obligations this day —> skip without counting or breaking.
+                guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+                cursor = prev
+                isFirstDay = false
+                continue
+            }
+
+            let allCheckedIn = activeSchedules.allSatisfy { schedule in
+                pairing.status(for: cursor, scheduleId: schedule.id) == .checkedIn
+            }
+
+            if allCheckedIn {
+                streak += 1
+            } else if !isFirstDay {
+                // A prior scheduled day was incomplete -> streak ends here.
+                break
+            }
+            // else: today with incomplete slots -> in progress, keep going.
+
+            guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+            cursor = prev
+            isFirstDay = false
+        }
+
+        return streak
+    }
+    
     // MARK: - Perform Check-In (saves to Firebase)
     func performCheckIn(
         username: String,
@@ -406,8 +453,8 @@ class CheckInViewModel: ObservableObject {
         )
         pairings[index].checkIns.insert(newCheckIn, at: 0)
 
-        pairings[index].currentStreak += 1
-        let newStreak = pairings[index].currentStreak
+        let newStreak = recomputeStreak(for: pairings[index])
+        pairings[index].currentStreak = newStreak
 
         do {
             // Doc ID bucketed by (pairing, schedule, day) — repeated taps
