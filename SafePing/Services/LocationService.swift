@@ -68,10 +68,6 @@ class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         DispatchQueue.main.async {
             self.authorizationStatus = manager.authorizationStatus
-            // Start receiving updates automatically once permission is granted
-            if self.hasPermission {
-                manager.startUpdatingLocation()
-            }
         }
     }
 }

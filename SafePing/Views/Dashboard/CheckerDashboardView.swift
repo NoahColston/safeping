@@ -48,8 +48,9 @@ struct CheckerDashboardView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 8)
             }
-            
-            if selectedTab == 3 {
+            if selectedTab == 2 {
+                CheckerMapView(checkInViewModel: checkInViewModel)
+            } else if selectedTab == 3 {
                 SettingsView()
             } else {
                 ScrollView {

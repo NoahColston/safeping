@@ -337,6 +337,10 @@ class CheckInViewModel: ObservableObject {
             }
         }
     }
+    
+    func updateGracePeriod(_ minutes: Int, scheduleId: UUID, in pairingId: UUID? = nil) {
+        mutateSchedule(scheduleId, in: pairingId) { $0.gracePeriodMinutes = minutes }
+    }
 
     private func mutateSchedule(
         _ scheduleId: UUID,

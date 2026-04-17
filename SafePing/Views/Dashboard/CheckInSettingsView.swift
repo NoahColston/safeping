@@ -70,6 +70,9 @@ struct CheckInSettingsView: View {
                                 },
                                 onToggleDay: { weekday in
                                     viewModel.toggleScheduleDay(weekday, scheduleId: schedule.id)
+                                },
+                                onGracePeriodChange: { minutes in
+                                    viewModel.updateGracePeriod(minutes, scheduleId: schedule.id)
                                 }
                             )
                         }
@@ -106,6 +109,7 @@ private struct ScheduleRow: View {
     let onTimeChange: (Date) -> Void
     let onFrequencyChange: (CheckInFrequency) -> Void
     let onToggleDay: (Int) -> Void
+    let onGracePeriodChange: (Int) -> Void
 
     @State private var draftMessage: String = ""
 
@@ -234,7 +238,36 @@ private struct ScheduleRow: View {
                             }
                         }
                     }
+                    // Grace period
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Alert Delay")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.safePingTextMuted)
+                            .textCase(.uppercase)
+                            .tracking(0.4)
 
+                        HStack(spacing: 12) {
+                            Text("\(schedule.gracePeriodMinutes) min")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.safePingDark)
+                                .frame(width: 60)
+
+                            Stepper(
+                                "",
+                                value: Binding(
+                                    get: { schedule.gracePeriodMinutes },
+                                    set: { onGracePeriodChange($0) }
+                                ),
+                                in: 5...120,
+                                step: 5
+                            )
+                            .labelsHidden()
+                        }
+
+                        Text("Checker is alerted if no check-in within \(schedule.gracePeriodMinutes) min of scheduled time.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.safePingTextMuted)
+                    }
                     // Delete button
                     if canDelete {
                         HStack {

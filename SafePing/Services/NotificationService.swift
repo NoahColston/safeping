@@ -125,6 +125,79 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         }
     }
     
+    // MARK: - Escalation notifications (fire after grace period if not checked in)
+    // These are scheduled on the checkee's device. Each one fires at
+    // (scheduled time + gracePeriodMinutes). When the checkee performs a
+    // check-in, the corresponding escalation notification is cancelled.
+    static let escalationRequestPrefix = "escalation-"
+
+    func scheduleEscalationNotifications(for pairings: [Pairing], username: String) {
+        Task {
+            await cancelEscalationNotificationsAsync()
+
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            guard settings.authorizationStatus == .authorized else { return }
+
+            for pairing in pairings {
+                for schedule in pairing.schedules {
+                    let content = UNMutableNotificationContent()
+                    content.title = "⚠️ Missed check-in"
+                    content.body = schedule.message.isEmpty
+                        ? "You missed your check-in. Your checker will be notified."
+                        : "Missed: \(schedule.message). Your checker will be notified."
+                    content.sound = .default
+                    content.userInfo = [
+                        "type": "escalation",
+                        "pairingId": pairing.id.uuidString,
+                        "scheduleId": schedule.id.uuidString
+                    ]
+
+                    // Fire at scheduled time + grace period
+                    let fireMinute = (schedule.minute + schedule.gracePeriodMinutes) % 60
+                    let extraHours = (schedule.minute + schedule.gracePeriodMinutes) / 60
+                    let fireHour = (schedule.hour + extraHours) % 24
+
+                    if schedule.frequency == .daily {
+                        var components = DateComponents()
+                        components.hour = fireHour
+                        components.minute = fireMinute
+                        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+                        let identifier = "\(NotificationService.escalationRequestPrefix)\(pairing.id.uuidString)-\(schedule.id.uuidString)-daily"
+                        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+                        try? await UNUserNotificationCenter.current().add(request)
+                    } else {
+                        for weekday in schedule.activeDays {
+                            var components = DateComponents()
+                            components.hour = fireHour
+                            components.minute = fireMinute
+                            components.weekday = weekday
+                            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+                            let identifier = "\(NotificationService.escalationRequestPrefix)\(pairing.id.uuidString)-\(schedule.id.uuidString)-w\(weekday)"
+                            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+                            try? await UNUserNotificationCenter.current().add(request)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Cancel a specific schedule's escalation notification (call when check-in succeeds)
+    func cancelEscalationForSchedule(pairingId: UUID, scheduleId: UUID) {
+        Task {
+            let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
+            let prefix = "\(NotificationService.escalationRequestPrefix)\(pairingId.uuidString)-\(scheduleId.uuidString)"
+            let toCancel = pending.map(\.identifier).filter { $0.hasPrefix(prefix) }
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: toCancel)
+        }
+    }
+
+    private func cancelEscalationNotificationsAsync() async {
+        let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
+        let toCancel = pending.map(\.identifier).filter { $0.hasPrefix(NotificationService.escalationRequestPrefix) }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: toCancel)
+    }
+
     // MARK: - Story 16: Handle "Check In" action tapped from notification banner
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,

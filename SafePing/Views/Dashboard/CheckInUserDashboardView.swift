@@ -226,7 +226,7 @@ struct CheckInUserDashboardView: View {
     private var pairingsFingerprint: String {
         checkInViewModel.pairings.map { pairing in
             let scheduleParts = pairing.schedules.map {
-                "\($0.id.uuidString):\($0.hour):\($0.minute):\($0.frequency.rawValue):\($0.activeDays.sorted()):\($0.message)"
+                "\($0.id.uuidString):\($0.hour):\($0.minute):\($0.frequency.rawValue):\($0.activeDays.sorted()):\($0.message):\($0.gracePeriodMinutes)"
             }.joined(separator: "|")
             return "\(pairing.id.uuidString)#\(scheduleParts)"
         }.joined(separator: "/")
@@ -285,6 +285,7 @@ struct CheckInUserDashboardView: View {
     private func performCheckIn(scheduleId: UUID) {
         locationService.captureLocation()
         let coordinate = locationService.currentLocation?.coordinate
+        let pairingId = checkInViewModel.selectedPairing?.id
         Task {
             await checkInViewModel.performCheckIn(
                 username: authViewModel.currentUser?.username ?? "",
@@ -294,6 +295,12 @@ struct CheckInUserDashboardView: View {
             notificationService.simulateCheckerAlert(
                 checkeeName: authViewModel.currentUser?.username ?? "User"
             )
+            if let pairingId {
+                notificationService.cancelEscalationForSchedule(
+                    pairingId: pairingId,
+                    scheduleId: scheduleId
+                )
+            }
         }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
             pulsingScheduleId = scheduleId

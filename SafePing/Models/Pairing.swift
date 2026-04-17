@@ -14,19 +14,22 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
     var time: Date
     var frequency: CheckInFrequency
     var activeDays: Set<Int>
+    var gracePeriodMinutes: Int
 
     init(
         id: UUID = UUID(),
         message: String = "",
         time: Date = Calendar.current.date(from: DateComponents(hour: 9, minute: 0)) ?? Date(),
         frequency: CheckInFrequency = .daily,
-        activeDays: Set<Int> = Set(1...7)
+        activeDays: Set<Int> = Set(1...7),
+        gracePeriodMinutes: Int = 15
     ) {
         self.id = id
         self.message = message
         self.time = time
         self.frequency = frequency
         self.activeDays = activeDays
+        self.gracePeriodMinutes = gracePeriodMinutes
     }
 
     var hour: Int {
@@ -52,6 +55,19 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
         return activeDays.contains(weekday)
     }
     
+    // Returns the deadline for check-in before
+    // the checker is alerted.
+    func escalationTime(for date: Date) -> Date? {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: date)
+        guard isScheduled(weekday: weekday) else { return nil }
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        components.hour = hour
+        components.minute = minute
+        guard let scheduledTime = calendar.date(from: components) else { return nil }
+        return calendar.date(byAdding: .minute, value: gracePeriodMinutes, to: scheduledTime)
+    }
+    
     func toFirestore() -> [String: Any] {
         [
             "id": id.uuidString,
@@ -59,7 +75,8 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
             "hour": hour,
             "minute": minute,
             "frequency": frequency.rawValue,
-            "activeDays": Array(activeDays).sorted()
+            "activeDays": Array(activeDays).sorted(),
+            "gracePeriodMinutes": gracePeriodMinutes
         ]
     }
      
@@ -72,10 +89,10 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
         let frequencyRaw = data["frequency"] as? String ?? CheckInFrequency.daily.rawValue
         let frequency = CheckInFrequency(rawValue: frequencyRaw) ?? .daily
         let activeDaysArray = data["activeDays"] as? [Int] ?? Array(1...7)
- 
+        let gracePeriod = data["gracePeriodMinutes"] as? Int ?? 15
         let time = Calendar.current.date(from: DateComponents(hour: hour, minute: minute)) ?? Date()
  
-        return CheckInSchedule(id: id, message: message, time: time, frequency: frequency, activeDays: Set(activeDaysArray))
+        return CheckInSchedule(id: id, message: message, time: time, frequency: frequency, activeDays: Set(activeDaysArray), gracePeriodMinutes: gracePeriod)
     }
 }
 
@@ -175,6 +192,34 @@ struct Pairing: Identifiable, Codable {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE 'at' h:mma"
         return "Last checked in \(formatter.string(from: last.date))"
+    }
+    
+    // Returns schedules that are currently past their grace period without a check-in today.
+    func escalatedSchedules(at now: Date = Date()) -> [CheckInSchedule] {
+        let calendar = Calendar.current
+        let todaysSchedules = schedules(forDate: now)
+        return todaysSchedules.filter { schedule in
+            guard let deadline = schedule.escalationTime(for: now) else { return false }
+            guard now > deadline else { return false }
+            // No check-in recorded for this slot today
+            return status(for: now, scheduleId: schedule.id) != .checkedIn
+        }
+    }
+
+    // True if any schedule for today is past its grace period without a check-in.
+    var isEscalated: Bool {
+        !escalatedSchedules().isEmpty
+    }
+
+    // The most recent check-in that has location data, for map display.
+    var lastKnownLocation: (latitude: Double, longitude: Double)? {
+        guard let ci = checkIns
+            .filter({ $0.status == .checkedIn && $0.latitude != nil && $0.longitude != nil })
+            .sorted(by: { $0.date > $1.date })
+            .first,
+              let lat = ci.latitude, let lon = ci.longitude
+        else { return nil }
+        return (lat, lon)
     }
     
     // Next upcoming scheduled time across all schedules.
