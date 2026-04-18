@@ -162,6 +162,7 @@ private struct ScheduleRow: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
                             .background(Color.safePingBg)
+                            .foregroundColor(.safePingTextMuted)
                             .cornerRadius(10)
                             .onChange(of: draftMessage) { _, newValue in
                                 onMessageChange(newValue)
