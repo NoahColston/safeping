@@ -143,6 +143,17 @@ struct CheckInUserDashboardView: View {
                     // Schedule reminder with checker's custom message (Story 14)
                     if checkInViewModel.pairings.isEmpty {
                         await pairingViewModel.generateCode(for: user.username)
+                    } else {
+                        // Ensure notifications are always scheduled on launch,
+                        // not just when pairingsFingerprint changes.
+                        notificationService.scheduleAllReminders(
+                            for: checkInViewModel.pairings,
+                            username: user.username
+                        )
+                        notificationService.scheduleEscalationNotifications(
+                            for: checkInViewModel.pairings,
+                            username: user.username
+                        )
                     }
                 }
             }
@@ -153,6 +164,10 @@ struct CheckInUserDashboardView: View {
         .onChange(of: pairingsFingerprint) { _, _ in
             guard let username = authViewModel.currentUser?.username else { return }
             notificationService.scheduleAllReminders(
+                for: checkInViewModel.pairings,
+                username: username
+            )
+            notificationService.scheduleEscalationNotifications(
                 for: checkInViewModel.pairings,
                 username: username
             )
