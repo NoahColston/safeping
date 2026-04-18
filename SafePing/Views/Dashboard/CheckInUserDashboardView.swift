@@ -311,6 +311,8 @@ struct CheckInUserDashboardView: View {
                             status: pairing.status(for: today, scheduleId: schedule.id),
                             isPulsing: pulsingScheduleId == schedule.id,
                             checkerUsername: pairing.checkerUsername,
+                            isAvailable: checkInViewModel.isCheckInAvailable(for: schedule),
+                            opensAt: checkInViewModel.checkInOpensAt(for: schedule),
                             onCheckIn: { performCheckIn(scheduleId: schedule.id) }
                         )
                     }
@@ -399,10 +401,13 @@ private struct TodaySlotRow: View {
     let status: CheckInStatus?
     let isPulsing: Bool
     let checkerUsername: String
+    let isAvailable: Bool
+    let opensAt: String
     let onCheckIn: () -> Void
 
     private var alreadyCheckedIn: Bool { status == .checkedIn }
     private var wasMissed: Bool { status == .missed }
+    private var tooEarly: Bool { !alreadyCheckedIn && !wasMissed && !isAvailable }
 
     var body: some View {
         Button(action: { if !alreadyCheckedIn { onCheckIn() } }) {
@@ -428,13 +433,19 @@ private struct TodaySlotRow: View {
                 Spacer()
 
                 if !alreadyCheckedIn {
-                    Text("Check In")
+                    Text(tooEarly ? "Opens \(opensAt)" : "Check In")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
-                            LinearGradient(
+                            tooEarly
+                            ? LinearGradient(
+                                colors: [.safePingTextMuted.opacity(0.4), .safePingTextMuted.opacity(0.5)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
                                 colors: [.safePingGreenStart, .safePingGreenEnd],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -449,24 +460,27 @@ private struct TodaySlotRow: View {
             .scaleEffect(isPulsing ? 1.03 : 1.0)
         }
         .buttonStyle(.plain)
-        .disabled(alreadyCheckedIn)
+        .disabled(alreadyCheckedIn || tooEarly)
     }
 
     private var subtitle: String {
         if alreadyCheckedIn { return "Done · \(checkerUsername) notified" }
         if wasMissed { return "Missed · \(schedule.formattedTime)" }
+        if tooEarly { return "Available at \(opensAt)" }
         return schedule.formattedTime
     }
 
     private var iconName: String {
         if alreadyCheckedIn { return "checkmark.circle.fill" }
         if wasMissed { return "exclamationmark.circle.fill" }
+        if tooEarly { return "lock.fill" }
         return "clock.fill"
     }
 
     private var iconColor: Color {
         if alreadyCheckedIn { return .safePingGreenEnd }
         if wasMissed { return .safePingError }
+        if tooEarly { return .safePingTextMuted }
         return .safePingGreenMid
     }
 

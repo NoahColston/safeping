@@ -238,6 +238,35 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     ) async {
         let db = Firestore.firestore()
         let today = Date()
+        
+        // Look up the schedule's configured time from the
+        // pairing document and reject if more than 15 minutes early.
+        if !scheduleId.isEmpty, let _ = UUID(uuidString: scheduleId) {
+            do {
+                let pairDoc = try await db.collection("pairs").document(pairingId).getDocument()
+                if let pairData = pairDoc.data(),
+                   let schedulesArr = pairData["schedules"] as? [[String: Any]] {
+                    let matched = schedulesArr.first { ($0["id"] as? String) == scheduleId }
+                    if let matched = matched {
+                        let schedule = CheckInSchedule.fromFirestore(matched)
+                        let calendar = Calendar.current
+                        var components = calendar.dateComponents([.year, .month, .day], from: today)
+                        components.hour = schedule.hour
+                        components.minute = schedule.minute
+                        if let scheduledTime = calendar.date(from: components),
+                           let earliest = calendar.date(byAdding: .minute, value: -15, to: scheduledTime),
+                           today < earliest {
+                            // Too early — silently skip
+                            return
+                        }
+                    }
+                }
+            } catch {
+                // If we can't verify, allow the check-in
+            }
+        }
+        
+        
         let dayKey = Int(Calendar.current.startOfDay(for: today).timeIntervalSince1970)
         let scheduleKey = scheduleId.isEmpty ? "legacy" : scheduleId
         let docId = "\(pairingId)_\(scheduleKey)_\(dayKey)"

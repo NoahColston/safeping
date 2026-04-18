@@ -442,6 +442,21 @@ class CheckInViewModel: ObservableObject {
         guard let index = selectedPairingIndex else { return }
         let today = Date()
         let pairingId = pairings[index].id
+        
+        // reject check-ins more than 15 minutes before scheduled time
+        if let schedule = pairings[index].schedules.first(where: { $0.id == scheduleId }) {
+            let calendar = Calendar.current
+            var components = calendar.dateComponents([.year, .month, .day], from: today)
+            components.hour = schedule.hour
+            components.minute = schedule.minute
+            if let scheduledTime = calendar.date(from: components) {
+                let earliestAllowed = calendar.date(byAdding: .minute, value: -15, to: scheduledTime)!
+                if today < earliestAllowed {
+                    errorMessage = "Too early — check-in opens at \(CheckInViewModel.formatTime(earliestAllowed))."
+                    return
+                }
+            }
+        }
 
         // Remove any pending/missed placeholder for this slot today
         pairings[index].checkIns.removeAll { ci in
@@ -489,5 +504,38 @@ class CheckInViewModel: ObservableObject {
         } catch {
             errorMessage = "Failed to save check-in for pairing \(pairingId.uuidString): \(error.localizedDescription)"
         }
+    }
+    
+    // MARK: - Time Helpers
+
+    static func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+
+    // Returns true if the current time is within the check-in window
+    // (no earlier than 15 minutes before the scheduled time).
+    func isCheckInAvailable(for schedule: CheckInSchedule) -> Bool {
+        let now = Date()
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: now)
+        components.hour = schedule.hour
+        components.minute = schedule.minute
+        guard let scheduledTime = calendar.date(from: components) else { return false }
+        let earliestAllowed = calendar.date(byAdding: .minute, value: -15, to: scheduledTime)!
+        return now >= earliestAllowed
+    }
+
+    // Human-readable string for when check-in opens (15 min before scheduled time).
+    func checkInOpensAt(for schedule: CheckInSchedule) -> String {
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: Date())
+        components.hour = schedule.hour
+        components.minute = schedule.minute
+        guard let scheduledTime = calendar.date(from: components),
+              let earliest = calendar.date(byAdding: .minute, value: -15, to: scheduledTime)
+        else { return schedule.formattedTime }
+        return CheckInViewModel.formatTime(earliest)
     }
 }
