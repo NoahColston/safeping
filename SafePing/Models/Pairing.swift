@@ -206,9 +206,37 @@ struct Pairing: Identifiable, Codable {
         }
     }
 
-    // True if any schedule for today is past its grace period without a check-in.
     var isEscalated: Bool {
-        !escalatedSchedules().isEmpty
+        let calendar = Calendar.current
+        let now = Date()
+
+        for schedule in schedules {
+            // Today's grace period passed without a check-in
+            if let deadline = schedule.escalationTime(for: now),
+               now > deadline,
+               status(for: now, scheduleId: schedule.id) != .checkedIn {
+                return true
+            }
+
+            // Most recent scheduled day before today was missed
+            // and today's slot hasn't been completed yet
+            var cursor = now
+            for _ in 0..<7 {
+                guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+                cursor = prev
+                let wd = calendar.component(.weekday, from: cursor)
+                guard schedule.isScheduled(weekday: wd) else { continue }
+
+                // Found the last scheduled day — check its status
+                let pastStatus = status(for: cursor, scheduleId: schedule.id)
+                let todayStatus = status(for: now, scheduleId: schedule.id)
+                if pastStatus != .checkedIn && todayStatus != .checkedIn {
+                    return true
+                }
+                break // only care about the most recent one
+            }
+        }
+        return false
     }
 
     // The most recent check-in that has location data, for map display.

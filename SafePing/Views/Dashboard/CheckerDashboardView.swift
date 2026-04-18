@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 struct CheckerDashboardView: View {
     @EnvironmentObject var authViewModel: AuthViewModel

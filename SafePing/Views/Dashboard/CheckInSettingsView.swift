@@ -264,7 +264,7 @@ private struct ScheduleRow: View {
                             .labelsHidden()
                         }
 
-                        Text("Checker is alerted if no check-in within \(schedule.gracePeriodMinutes) min of scheduled time.")
+                        Text("You will be alerted if they don't check-in within \(schedule.gracePeriodMinutes) min of scheduled time.")
                             .font(.system(size: 11))
                             .foregroundColor(.safePingTextMuted)
                     }
