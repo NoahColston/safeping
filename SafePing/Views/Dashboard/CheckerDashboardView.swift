@@ -10,12 +10,13 @@ struct CheckerDashboardView: View {
     @State private var showUnpairConfirm = false
     @State private var pairingToRemove: Pairing?
     @State private var selectedTab = 0
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
             // Top bar
             HStack {
-                Button(action: {}) {
+                Button(action: { showSettings = true }) {
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 20))
                         .foregroundColor(.safePingDark)
@@ -51,6 +52,8 @@ struct CheckerDashboardView: View {
             }
             if selectedTab == 2 {
                 CheckerMapView(checkInViewModel: checkInViewModel)
+            } else if selectedTab == 1 {
+                EscalationsView(checkInViewModel: checkInViewModel)
             } else if selectedTab == 3 {
                 SettingsView()
             } else {
@@ -115,7 +118,10 @@ struct CheckerDashboardView: View {
                     }
                 }
             }
-            BottomTabBar(selectedTab: $selectedTab)
+            BottomTabBar(
+                selectedTab: $selectedTab,
+                icons: ["house.fill", "exclamationmark.triangle.fill", "map.fill", "gearshape.fill"]
+            )
         }
         .background(Color.safePingBg.ignoresSafeArea())
         .onAppear {
@@ -127,6 +133,11 @@ struct CheckerDashboardView: View {
         }
         .onDisappear {
             checkInViewModel.stopListening()
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environmentObject(authViewModel)
+                .environmentObject(notificationService)
         }
         // Story 12: Sheet to add a new pairing
         .sheet(isPresented: $showAddPairing, onDismiss: {
@@ -358,13 +369,13 @@ struct AddPairingSheet: View {
 // MARK: Bottom Tab Bar
 struct BottomTabBar: View {
     @Binding var selectedTab: Int
+    var icons: [String] = ["house.fill", "person.2.fill", "map.fill", "gearshape.fill"]
 
     var body: some View {
         HStack {
-            TabBarItem(icon: "house.fill", isSelected: selectedTab == 0) { selectedTab = 0 }
-            TabBarItem(icon: "person.2.fill", isSelected: selectedTab == 1) { selectedTab = 1 }
-            TabBarItem(icon: "map.fill", isSelected: selectedTab == 2) { selectedTab = 2 }
-            TabBarItem(icon: "gearshape.fill", isSelected: selectedTab == 3) { selectedTab = 3 }
+            ForEach(icons.indices, id: \.self) { i in
+                TabBarItem(icon: icons[i], isSelected: selectedTab == i) { selectedTab = i }
+            }
         }
         .padding(.horizontal, 32)
         .padding(.vertical, 12)

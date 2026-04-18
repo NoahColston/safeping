@@ -10,25 +10,26 @@ struct CheckInUserDashboardView: View {
     @State private var pulsingScheduleId: UUID?
     @State private var showPairingCode = false
     @State private var selectedTab = 0
+    @State private var showSettings = false
     
     var body: some View {
         VStack(spacing: 0) {
             // Top bar
             HStack {
-                Button(action: {}) {
+                Button(action: { showSettings = true }) {
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 20))
                         .foregroundColor(.safePingDark)
                 }
-                
+
                 Spacer()
-                
+
                 Text("SafePing")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.safePingDark)
-                
+
                 Spacer()
-                
+
                 // Story 12: tap profile icon to get a new pairing code
                 Button(action: { showPairingCode = true }) {
                     Circle()
@@ -46,6 +47,18 @@ struct CheckInUserDashboardView: View {
             
             if selectedTab == 3 {
                 SettingsView()
+            } else if selectedTab == 2 {
+                if let pairing = checkInViewModel.selectedPairing {
+                    CheckeeLocationView(pairing: pairing)
+                } else {
+                    noPairingPlaceholder
+                }
+            } else if selectedTab == 1 {
+                if let pairing = checkInViewModel.selectedPairing {
+                    CheckInLogView(pairing: pairing)
+                } else {
+                    noPairingPlaceholder
+                }
             } else {
                 ScrollView {
                     VStack(spacing: 20) {
@@ -117,7 +130,10 @@ struct CheckInUserDashboardView: View {
                     }
                 }
             }
-            BottomTabBar(selectedTab: $selectedTab)
+            BottomTabBar(
+                selectedTab: $selectedTab,
+                icons: ["house.fill", "list.bullet.clipboard.fill", "location.fill", "gearshape.fill"]
+            )
         }
         .background(Color.safePingBg.ignoresSafeArea())
         .onAppear {
@@ -148,6 +164,12 @@ struct CheckInUserDashboardView: View {
                 await pairingViewModel.generateCode(for: username)
             }
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environmentObject(authViewModel)
+                .environmentObject(notificationService)
+                .environmentObject(locationService)
+        }
         // Story 12: Sheet to generate a new pairing code for another checker
         .sheet(isPresented: $showPairingCode) {
             GetPairingCodeSheet()
@@ -157,6 +179,25 @@ struct CheckInUserDashboardView: View {
         }
     }
     
+    private var noPairingPlaceholder: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "person.badge.plus")
+                .font(.system(size: 48))
+                .foregroundColor(.safePingTextMuted)
+            Text("No checker yet")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundColor(.safePingDark)
+            Text("Pair with a checker first to see this data.")
+                .font(.system(size: 14))
+                .foregroundColor(.safePingTextMuted)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.safePingBg)
+    }
+
     private var inlinePairingCodeState: some View {
         VStack(spacing: 24) {
             Image(systemName: "hand.wave.fill")
