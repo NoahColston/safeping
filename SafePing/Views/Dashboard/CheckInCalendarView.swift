@@ -58,7 +58,7 @@ struct CheckInCalendarView: View {
                     if let date = date {
                         DayCell(
                             date: date,
-                            status: pairing.status(for: date),
+                            slotStatuses: pairing.slotStatuses(for: date),
                             isToday: calendar.isDateInToday(date),
                             isCurrentMonth: calendar.isDate(date, equalTo: displayedMonth, toGranularity: .month)
                         )
@@ -133,11 +133,12 @@ struct CheckInCalendarView: View {
 // MARK: - Individual Day Cell
 struct DayCell: View {
     let date: Date
-    let status: CheckInStatus?
+    let slotStatuses: [SlotStatus]
     let isToday: Bool
     let isCurrentMonth: Bool
 
     private let calendar = Calendar.current
+    private let dotSize: CGFloat = 34
 
     var body: some View {
         let dayNumber = calendar.component(.day, from: date)
@@ -145,14 +146,12 @@ struct DayCell: View {
 
         ZStack {
             // Background circle for status
-            if let status = status, !isFuture {
-                Circle()
-                    .fill(backgroundColor(for: status))
-                    .frame(width: 34, height: 34)
+            if !slotStatuses.isEmpty && !isFuture {
+                PieChartDot(statuses: slotStatuses, size: dotSize)
             } else if isToday {
                 Circle()
                     .stroke(Color.safePingGreenMid, lineWidth: 2)
-                    .frame(width: 34, height: 34)
+                    .frame(width: dotSize, height: dotSize)
             }
 
             Text("\(dayNumber)")
@@ -163,23 +162,66 @@ struct DayCell: View {
         .opacity(isCurrentMonth ? 1.0 : 0.35)
     }
 
-    private func backgroundColor(for status: CheckInStatus) -> Color {
-        switch status {
-        case .checkedIn: return .safePingGreenMid.opacity(0.85)
-        case .missed: return .safePingError.opacity(0.85)
-        case .pending: return .safePingBorder.opacity(0.5)
-        }
-    }
-
     private func textColor(isFuture: Bool) -> Color {
         if isFuture { return .safePingTextMuted.opacity(0.5) }
-        if let status = status {
-            switch status {
-            case .checkedIn, .missed: return .white
-            case .pending: return .safePingDark
-            }
+        if !slotStatuses.isEmpty {
+            // Use white text when the dominant color is dark enough
+            let hasVisibleDot = slotStatuses.contains { $0 != .upcoming }
+            if hasVisibleDot { return .white }
         }
         return isCurrentMonth ? .safePingDark : .safePingTextMuted
+    }
+}
+
+// Draws a circle divided into equal wedges, one per schedule slot,
+// colored by that slot's status. Wedges start at 12 o'clock and
+// proceed clockwise.
+struct PieChartDot: View {
+    let statuses: [SlotStatus]
+    let size: CGFloat
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+            let radius = min(canvasSize.width, canvasSize.height) / 2
+
+            if statuses.count == 1 {
+                // Single slot — just draw a filled circle
+                let rect = CGRect(x: center.x - radius, y: center.y - radius,
+                                  width: radius * 2, height: radius * 2)
+                let path = Path(ellipseIn: rect)
+                context.fill(path, with: .color(color(for: statuses[0])))
+                return
+            }
+
+            let sliceAngle = 360.0 / Double(statuses.count)
+
+            for (index, status) in statuses.enumerated() {
+                // Start at 12 o'clock (-90°), move clockwise
+                let startAngle = Angle.degrees(-90 + sliceAngle * Double(index))
+                let endAngle = Angle.degrees(-90 + sliceAngle * Double(index + 1))
+
+                var path = Path()
+                path.move(to: center)
+                path.addArc(center: center, radius: radius,
+                            startAngle: startAngle, endAngle: endAngle,
+                            clockwise: false)
+                path.closeSubpath()
+
+                context.fill(path, with: .color(color(for: status)))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+
+    private func color(for status: SlotStatus) -> Color {
+        switch status {
+        case .checkedIn: return .safePingGreenMid.opacity(0.85)
+        case .missed:    return .safePingError.opacity(0.85)
+        case .inGrace:   return .yellow.opacity(0.85)
+        case .upcoming:  return .safePingBorder.opacity(0.5)
+        }
     }
 }
 
