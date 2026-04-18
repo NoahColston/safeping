@@ -8,6 +8,13 @@ enum CheckInFrequency: String, Codable, CaseIterable {
     var displayName: String { rawValue }
 }
 
+enum SlotStatus: Hashable {
+    case checkedIn   // green — completed
+    case missed      // red — past grace period, no check-in
+    case inGrace     // yellow — scheduled time passed, still within grace period
+    case upcoming    // grey — scheduled time hasn't arrived yet
+}
+
 struct CheckInSchedule: Codable, Identifiable, Hashable {
     let id: UUID
     var message: String
@@ -162,6 +169,56 @@ struct Pairing: Identifiable, Codable {
         if isPast && statuses.contains(where: { $0 != .checkedIn }) { return .missed }
 
         return .pending
+    }
+    
+    // Returns an ordered array of per-schedule slot statuses for a given date,
+    // sorted by schedule time. Used by the calendar pie-chart dot.
+    func slotStatuses(for date: Date, at now: Date = Date()) -> [SlotStatus] {
+        let calendar = Calendar.current
+        
+        // Before pairing existed — no data
+        if calendar.startOfDay(for: date) < calendar.startOfDay(for: pairedAt) {
+            return []
+        }
+        
+        let daySchedules = schedules(forDate: date)
+        guard !daySchedules.isEmpty else { return [] }
+        
+        let isDateToday = calendar.isDateInToday(date)
+        let isPast = calendar.startOfDay(for: date) < calendar.startOfDay(for: now)
+        
+        return daySchedules.map { schedule in
+            let checkInStatus = status(for: date, scheduleId: schedule.id)
+            
+            if checkInStatus == .checkedIn {
+                return .checkedIn
+            }
+            
+            // Build the scheduled time on the target date
+            var components = calendar.dateComponents([.year, .month, .day], from: date)
+            components.hour = schedule.hour
+            components.minute = schedule.minute
+            let scheduledTime = calendar.date(from: components) ?? date
+            let graceDeadline = calendar.date(byAdding: .minute, value: schedule.gracePeriodMinutes, to: scheduledTime) ?? scheduledTime
+            
+            if isPast {
+                // Any past day slot without a check-in is missed
+                return .missed
+            }
+            
+            if isDateToday {
+                if now < scheduledTime {
+                    return .upcoming       // grey — hasn't fired yet
+                } else if now <= graceDeadline {
+                    return .inGrace        // yellow — in grace period
+                } else {
+                    return .missed         // red — past grace period
+                }
+            }
+            
+            // Future date
+            return .upcoming
+        }
     }
 
     var lastCheckIn: CheckIn? {
