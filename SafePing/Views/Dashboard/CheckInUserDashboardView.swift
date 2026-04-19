@@ -1,3 +1,7 @@
+// SafePing — CheckInUserDashboardView.swift
+// Main dashboard for users who check in. Shows today's schedules, streak,
+// calendar history, and a live weather card (networking demo).
+
 import SwiftUI
 
 struct CheckInUserDashboardView: View {
@@ -6,6 +10,7 @@ struct CheckInUserDashboardView: View {
     @EnvironmentObject var notificationService: NotificationService
     @EnvironmentObject var locationService: LocationService
     @StateObject private var pairingViewModel = PairingViewModel()
+    @StateObject private var weatherService = WeatherService()
     
     @State private var pulsingScheduleId: UUID?
     @State private var showPairingCode = false
@@ -16,22 +21,13 @@ struct CheckInUserDashboardView: View {
         VStack(spacing: 0) {
             // Top bar
             HStack {
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 20))
-                        .foregroundColor(.safePingDark)
-                }
-
-                Spacer()
-
                 Text("SafePing")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.safePingDark)
 
                 Spacer()
 
-                // Story 12: tap profile icon to get a new pairing code
-                Button(action: { showPairingCode = true }) {
+                Button(action: { showSettings = true }) {
                     Circle()
                         .fill(Color.safePingBorder)
                         .frame(width: 32, height: 32)
@@ -69,6 +65,11 @@ struct CheckInUserDashboardView: View {
                                 .foregroundColor(.safePingDark)
                         }
                         .padding(.top, 8)
+
+                        // Weather card (networking: live Open-Meteo REST fetch)
+                        WeatherCard(weather: weatherService.currentWeather,
+                                    isLoading: weatherService.isLoading)
+                            .padding(.horizontal, 20)
                         
                         if checkInViewModel.pairings.isEmpty {
                             // No checkers yet — show inline pairing code
@@ -140,6 +141,10 @@ struct CheckInUserDashboardView: View {
             if let user = authViewModel.currentUser {
                 Task {
                     await checkInViewModel.loadData(for: user.username, role: .checkInUser)
+                    // Networking: fetch live weather using device location when available
+                    let lat = locationService.currentLocation?.coordinate.latitude ?? 37.7749
+                    let lon = locationService.currentLocation?.coordinate.longitude ?? -122.4194
+                    await weatherService.fetchWeather(latitude: lat, longitude: lon)
                     // Schedule reminder with checker's custom message (Story 14)
                     if checkInViewModel.pairings.isEmpty {
                         await pairingViewModel.generateCode(for: user.username)
@@ -583,6 +588,48 @@ struct GetPairingCodeSheet: View {
                 await vm.generateCode(for: authViewModel.currentUser?.username ?? "")
             }
         }
+    }
+}
+
+// MARK: - Weather Card
+// [Functional] Pure view that renders whatever snapshot WeatherService publishes
+struct WeatherCard: View {
+    let weather: WeatherSnapshot?
+    let isLoading: Bool
+
+    var body: some View {
+        HStack(spacing: 14) {
+            if isLoading {
+                ProgressView()
+                    .frame(width: 36, height: 36)
+            } else {
+                Image(systemName: weather?.symbolName ?? "cloud.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(.safePingGreenMid)
+                    .frame(width: 36, height: 36)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(weather?.condition ?? "Weather")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.safePingDark)
+                if let w = weather {
+                    Text("\(Int(w.temperatureFahrenheit))°F · Wind \(Int(w.windspeedKph)) km/h")
+                        .font(.system(size: 12))
+                        .foregroundColor(.safePingTextMuted)
+                } else if !isLoading {
+                    Text("Offline — showing cached data")
+                        .font(.system(size: 12))
+                        .foregroundColor(.safePingTextMuted)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.white)
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
     }
 }
 

@@ -1,3 +1,8 @@
+// SafePing — RegisterView.swift
+// New account registration. Hashes the password via CryptoUtils before
+// passing it to AuthViewModel so plaintext never reaches Firestore.
+// [OOP] Delegates persistence to AuthViewModel.
+
 import SwiftUI
 
 struct RegisterView: View {

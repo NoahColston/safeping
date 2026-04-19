@@ -1,3 +1,7 @@
+// SafePing — CheckerDashboardView.swift
+// Dashboard for checkers: shows paired users, their status, calendar, and map.
+// [OOP] Delegates data fetching and pairing mutations to CheckInViewModel.
+
 import SwiftUI
 import MapKit
 
@@ -16,28 +20,22 @@ struct CheckerDashboardView: View {
         VStack(spacing: 0) {
             // Top bar
             HStack {
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 20))
-                        .foregroundColor(.safePingDark)
-                }
-                
-                Spacer()
-                
                 Text("SafePing")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.safePingDark)
-                
+
                 Spacer()
-                
-                Circle()
-                    .fill(Color.safePingBorder)
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(.safePingTextMuted)
-                    )
+
+                Button(action: { showSettings = true }) {
+                    Circle()
+                        .fill(Color.safePingBorder)
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.safePingTextMuted)
+                        )
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)

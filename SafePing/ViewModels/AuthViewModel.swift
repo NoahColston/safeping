@@ -1,3 +1,10 @@
+// SafePing — AuthViewModel.swift
+// Manages authentication state: login, registration, session restore, and role selection.
+// [OOP] @MainActor class encapsulates all auth state and Firestore operations.
+// [Procedural] login() and register() sequence: validate → hash → read/write Firestore → update state.
+// [Functional] Computed properties (needsRoleSelection, needsNotificationPermission) derive
+//              booleans from published state without side effects.
+
 import Foundation
 import SwiftUI
 import FirebaseFirestore
@@ -93,7 +100,7 @@ class AuthViewModel: ObservableObject {
         Task {
             do {
                 let doc = try await db.collection(usersCollection).document(username).getDocument()
-                if let data = doc.data(), let user = userFromFirestore(data), user.password == password {
+                if let data = doc.data(), let user = userFromFirestore(data), user.password == CryptoUtils.hashPassword(password) {
                     currentUser = user
                     isAuthenticated = true
                     onboardingComplete = user.role != nil &&
@@ -184,7 +191,7 @@ class AuthViewModel: ObservableObject {
                     return
                 }
 
-                let newUser = User(username: trimmedUsername, password: password)
+                let newUser = User(username: trimmedUsername, password: CryptoUtils.hashPassword(password))
                 try await db.collection(usersCollection)
                     .document(trimmedUsername)
                     .setData(userToFirestore(newUser))

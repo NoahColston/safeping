@@ -1,3 +1,8 @@
+// SafePing — Pairing.swift
+// Domain models for pairings and schedules. A Pairing links one checker to one
+// check-in user and holds all schedules plus the check-in history.
+// [OOP] All models are value types (struct/enum) for safe cross-actor sharing.
+
 import Foundation
 
 // MARK: - Check-in Schedule

@@ -1,3 +1,7 @@
+// SafePing — PairingService.swift
+// Handles Firestore reads/writes for pairing codes and pairing documents.
+// [OOP] Stateless service class; no @Published properties -- callers hold state.
+
 import Foundation
 import FirebaseFirestore
 

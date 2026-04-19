@@ -1,3 +1,8 @@
+// SafePing — Theme.swift
+// Centralizes the app's color palette, typography helpers, and reusable input
+// components (SafePingTextField with optional eye-icon password toggle).
+// [Functional] Color constants are pure static values; no mutable state.
+
 import SwiftUI
 
 extension Color {
@@ -37,6 +42,17 @@ struct SafePingTextField: View {
     var errorMessage: String? = nil
 
     @FocusState private var isFocused: Bool
+    @State private var showPassword = false
+
+    @ViewBuilder private var fieldInput: some View {
+        if isSecure && !showPassword {
+            SecureField(placeholder, text: $text)
+        } else {
+            TextField(placeholder, text: $text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -45,27 +61,30 @@ struct SafePingTextField: View {
                 .foregroundColor(.safePingTextMuted)
                 .tracking(0.5)
 
-            Group {
-                if isSecure {
-                    SecureField(placeholder, text: $text)
-                } else {
-                    TextField(placeholder, text: $text)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+            fieldInput
+                .padding(14)
+                .padding(.trailing, isSecure ? 44 : 0)
+                .background(Color.safePingBg)
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(
+                            errorMessage != nil ? Color.safePingError :
+                            isFocused ? Color.safePingGreenMid : Color.safePingBorder,
+                            lineWidth: 1.5
+                        )
+                )
+                .focused($isFocused)
+                .overlay(alignment: .trailing) {
+                    if isSecure {
+                        Button(action: { showPassword.toggle() }) {
+                            Image(systemName: showPassword ? "eye.slash" : "eye")
+                                .font(.system(size: 16))
+                                .foregroundColor(.safePingTextMuted)
+                        }
+                        .padding(.trailing, 14)
+                    }
                 }
-            }
-            .padding(14)
-            .background(Color.safePingBg)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(
-                        errorMessage != nil ? Color.safePingError :
-                        isFocused ? Color.safePingGreenMid : Color.safePingBorder,
-                        lineWidth: 1.5
-                    )
-            )
-            .focused($isFocused)
 
             if let error = errorMessage {
                 Text(error)

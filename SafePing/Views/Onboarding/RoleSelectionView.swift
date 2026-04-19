@@ -1,3 +1,7 @@
+// SafePing — RoleSelectionView.swift
+// Onboarding step where the user picks Checker or Check-In User.
+// [OOP] Writes the selected role to AuthViewModel, which persists it to Firestore.
+
 import SwiftUI
 
 struct RoleSelectionView: View {

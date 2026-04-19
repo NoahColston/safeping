@@ -1,3 +1,7 @@
+// SafePing — PairingViewModel.swift
+// Generates and redeems 6-digit pairing codes via Firestore.
+// [OOP] Thin VM layer that delegates storage to PairingService.
+
 import SwiftUI
 
 @MainActor

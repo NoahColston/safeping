@@ -1,3 +1,7 @@
+// SafePing — CheckeeLocationView.swift
+// Shows the check-in user's last known location on a map for the checker.
+// [OOP] Reads location data from the Pairing model stored in CheckInViewModel.
+
 import SwiftUI
 import MapKit
 

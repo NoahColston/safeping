@@ -1,3 +1,7 @@
+// SafePing — EscalationsView.swift
+// Lists pairings that have missed check-ins so the checker can take action.
+// [Functional] View is a pure function of the CheckInViewModel's escalated pairings.
+
 import SwiftUI
 
 struct EscalationsView: View {

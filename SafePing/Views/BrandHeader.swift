@@ -1,3 +1,6 @@
+// SafePing — BrandHeader.swift
+// Shared logo + tagline header shown on auth screens.
+
 import SwiftUI
 
 struct BrandHeader: View {

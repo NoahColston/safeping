@@ -1,8 +1,12 @@
+// SafePing — SettingsView.swift
+// App settings: account info, notifications, about, sign-out, and (debug) seed controls.
+
 import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var notificationService: NotificationService
+    @StateObject private var seedService = SeedService()
 
     @State private var showDeleteConfirm = false
 
@@ -121,6 +125,39 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                // MARK: - Developer (sample data seed)
+                #if DEBUG
+                SettingsSection(title: "Developer") {
+                    Button(action: {
+                        Task { await seedService.seedSampleUsers() }
+                    }) {
+                        SettingsRow(
+                            icon: "person.3.fill",
+                            iconColor: .indigo,
+                            label: "Seed Sample Users"
+                        ) {
+                            if seedService.isSeeding {
+                                ProgressView().scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.safePingBorder)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(seedService.isSeeding)
+
+                    if let msg = seedService.seedMessage {
+                        Text(msg)
+                            .font(.system(size: 12))
+                            .foregroundColor(.safePingTextMuted)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 10)
+                    }
+                }
+                #endif
 
                 // MARK: - Danger Zone
                 SettingsSection(title: "Account Actions") {

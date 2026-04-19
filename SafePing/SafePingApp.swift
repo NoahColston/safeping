@@ -1,3 +1,7 @@
+// SafePing — SafePingApp.swift
+// App entry point. Configures Firebase and injects shared environment objects.
+// [OOP] Three ObservableObject services are created once and flow down the hierarchy.
+
 import SwiftUI
 import FirebaseCore
 

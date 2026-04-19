@@ -1,3 +1,7 @@
+// SafePing — ContentView.swift
+// Root routing view: shows auth flow or the role-appropriate dashboard.
+// [Functional] Reactive branching — body is a pure function of auth state.
+
 import SwiftUI
 
 struct ContentView: View {

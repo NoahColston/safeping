@@ -1,3 +1,7 @@
+// SafePing — CheckInLogView.swift
+// Chronological history of all check-in events for the selected pairing.
+// [Functional] Derives sorted log entries from CheckIn records in the pairing.
+
 import SwiftUI
 
 struct CheckInLogView: View {

@@ -1,3 +1,9 @@
+// SafePing — NotificationService.swift
+// Schedules and cancels local reminder and escalation notifications.
+// Acts as UNUserNotificationCenterDelegate to handle foreground delivery
+// and the "Check In Now" actionable notification button.
+// [OOP] Single service object injected app-wide via @EnvironmentObject.
+
 import UserNotifications
 import FirebaseFirestore
 
@@ -143,8 +149,8 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
                     let content = UNMutableNotificationContent()
                     content.title = "⚠️ Missed check-in"
                     content.body = schedule.message.isEmpty
-                        ? "You missed your check-in. Your checker will be notified."
-                        : "Missed: \(schedule.message). Your checker will be notified."
+                        ? "You missed your check-in. \(pairing.checkerUsername) will be notified."
+                        : "Missed: \(schedule.message). \(pairing.checkerUsername) will be notified."
                     content.sound = .default
                     content.userInfo = [
                         "type": "escalation",

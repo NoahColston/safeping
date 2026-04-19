@@ -1,3 +1,7 @@
+// SafePing — NotificationPermissionView.swift
+// Onboarding step that requests UNUserNotificationCenter authorization.
+// [OOP] Delegates permission request to NotificationService via @EnvironmentObject.
+
 import SwiftUI
 
 struct NotificationPermissionView: View {

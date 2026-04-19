@@ -1,8 +1,6 @@
-//
-//  CheckerMapView.swift
-//  SafePing
-//
-
+// SafePing — CheckerMapView.swift
+// Shows the last known location of each paired check-in user on a map.
+// [Functional] Map annotation data is derived from pairings' check-in records.
 
 import SwiftUI
 import MapKit

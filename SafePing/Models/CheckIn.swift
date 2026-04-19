@@ -1,3 +1,7 @@
+// SafePing — CheckIn.swift
+// Defines CheckInStatus and CheckIn record. Stored per-pairing in Firestore.
+// [OOP] CheckIn is a value type (struct) keyed on scheduleId + date.
+
 import Foundation
 
 enum CheckInStatus: String, Codable {

@@ -1,3 +1,8 @@
+// SafePing — CheckInSettingsView.swift
+// Lets the checker configure schedules (frequency, time, grace period, message)
+// and the escalation window for the selected pairing.
+// [OOP] Mutations are delegated to CheckInViewModel which writes back to Firestore.
+
 import SwiftUI
 
 struct CheckInSettingsView: View {

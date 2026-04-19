@@ -1,7 +1,7 @@
-//
-//  LocationService.swift
-//  SafePing
-//
+// SafePing — LocationService.swift
+// Wraps CLLocationManager to request permission and deliver the device's
+// current coordinate before a check-in is written to Firestore.
+// [OOP] NSObject subclass required for CLLocationManagerDelegate conformance.
 
 
 import CoreLocation

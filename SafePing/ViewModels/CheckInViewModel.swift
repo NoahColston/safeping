@@ -1,3 +1,8 @@
+// SafePing — CheckInViewModel.swift
+// Drives both dashboard views: loads pairings, performs check-ins, and manages
+// Firestore listeners. Acts as the single source of truth for pairing state.
+// [OOP] @MainActor ObservableObject; all mutations publish on the main thread.
+
 import Foundation
 import SwiftUI
 import FirebaseFirestore

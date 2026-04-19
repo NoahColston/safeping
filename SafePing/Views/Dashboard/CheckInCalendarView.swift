@@ -1,3 +1,7 @@
+// SafePing — CheckInCalendarView.swift
+// Monthly calendar showing check-in completion per day as dots (pie slice for partial).
+// [Functional] Calendar grid is computed from the pairing's check-in history.
+
 import SwiftUI
 
 struct CheckInCalendarView: View {

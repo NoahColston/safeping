@@ -1,3 +1,7 @@
+// SafePing — CheckerPairingView.swift
+// Onboarding screen where the checker enters the check-in user's 6-digit code.
+// [OOP] PairingViewModel redeems the code and creates the Firestore pairing document.
+
 import SwiftUI
 
 struct CheckerPairingView: View {

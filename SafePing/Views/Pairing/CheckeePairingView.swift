@@ -1,3 +1,7 @@
+// SafePing — CheckeePairingView.swift
+// Shows the 6-digit pairing code for the check-in user to share with their checker.
+// [OOP] PairingViewModel generates and stores the code in Firestore.
+
 import SwiftUI
 
 struct CheckeePairingView: View {

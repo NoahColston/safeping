@@ -1,3 +1,7 @@
+// SafePing — User.swift
+// Core domain models: UserRole enum and User struct stored in Firestore.
+// [OOP] User is a value type (struct) with an auto-generated UUID identity.
+
 import Foundation
 
 enum UserRole: String, Codable {
