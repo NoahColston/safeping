@@ -64,6 +64,25 @@ private struct EscalationCard: View {
     let pairing: Pairing
     let missedSchedules: [CheckInSchedule]
 
+    // Time since the latest missed deadline.
+    private var timeSinceMissed: String {
+        let now = Date()
+        let deadlines = missedSchedules.compactMap { $0.escalationTime(for: now) }
+        guard let earliest = deadlines.min() else { return "" }
+        let interval = now.timeIntervalSince(earliest)
+        let hours = Int(interval / 3600)
+        let minutes = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
+
+        if hours >= 24 {
+            let days = hours / 24
+            return "Overdue by \(days) day\(days == 1 ? "" : "s")"
+        } else if hours > 0 {
+            return "Overdue by \(hours) hr\(hours == 1 ? "" : "s") \(minutes) min"
+        } else {
+            return "Overdue by \(minutes) min"
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
@@ -80,9 +99,9 @@ private struct EscalationCard: View {
                     Text(pairing.checkInUsername)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.safePingDark)
-                    Text(pairing.timeSinceLastCheckIn)
+                    Text(timeSinceMissed)
                         .font(.system(size: 12))
-                        .foregroundColor(.safePingTextMuted)
+                        .foregroundColor(.safePingError.opacity(0.8))
                 }
 
                 Spacer()
@@ -108,7 +127,7 @@ private struct EscalationCard: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.safePingDark)
                         Spacer()
-                        Text("Grace period passed")
+                        Text("due \(schedule.formattedTime)")
                             .font(.system(size: 11))
                             .foregroundColor(.safePingTextMuted)
                     }

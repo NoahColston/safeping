@@ -313,8 +313,6 @@ class CheckInViewModel: ObservableObject {
                     return
                 }
                 
-                print("Received \(documents.count) check-in docs for pairing \(pairing.id.uuidString)")
-                
                 let checkIns = documents.compactMap { doc -> CheckIn? in
                     let data = doc.data()
                     guard
@@ -339,8 +337,6 @@ class CheckInViewModel: ObservableObject {
                     )
                 }
                 
-                print("Decoded \(checkIns.count) check-ins for pairing \(pairing.id.uuidString)")
-                
                 Task { @MainActor in
                     if checkIns.count != documents.count {
                         self.errorMessage = "Loaded \(checkIns.count) of \(documents.count) check-ins for \(pairing.checkInUsername). Some documents may be malformed."
@@ -360,7 +356,7 @@ class CheckInViewModel: ObservableObject {
         checkInListeners[pairing.id] = listener
     }
     
-    // --- Scheuling methods --
+    // --- Scheduling methods --
     
     
     // MARK: - Select Pairing

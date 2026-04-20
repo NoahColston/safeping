@@ -92,10 +92,6 @@ struct CheckInUserDashboardView: View {
                                 }
                             }
                             if let pairing = checkInViewModel.selectedPairing {
-                                Text("Checked in with \(pairing.checkerUsername)")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.safePingTextMuted)
-                                
                                 // Status cards row
                                 HStack(spacing: 12) {
                                     InfoCard(
