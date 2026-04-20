@@ -148,6 +148,10 @@ struct CheckInUserDashboardView: View {
         }
         .background(Color.safePingBg.ignoresSafeArea())
         .onAppear {
+            // Request location permission if not yet determined.
+            if locationService.authorizationStatus == .notDetermined {
+                locationService.requestPermission()
+            }
             if let user = authViewModel.currentUser {
                 Task {
                     await checkInViewModel.loadData(for: user.username, role: .checkInUser)
