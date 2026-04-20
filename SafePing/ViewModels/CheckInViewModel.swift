@@ -511,9 +511,10 @@ class CheckInViewModel: ObservableObject {
         scheduleId: UUID,
         location: CLLocationCoordinate2D? = nil
     ) async {
-        guard let index = selectedPairingIndex else { return }
+        guard let pairingId = selectedPairingId ?? pairings.first?.id,
+              let index = pairings.firstIndex(where: { $0.id == pairingId })
+        else { return }
         let today = Date()
-        let pairingId = pairings[index].id
         
         // reject check-ins more than 15 minutes before scheduled time
         if let schedule = pairings[index].schedules.first(where: { $0.id == scheduleId }) {
@@ -570,9 +571,15 @@ class CheckInViewModel: ObservableObject {
             }
 
             try await db.collection("checkIns").document(docId).setData(data)
-            try await db.collection("pairs")
-                .document(pairingId.uuidString)
-                .updateData(["currentStreak": newStreak])
+
+            // Re-lookup after await in case the array shifted
+            if let freshIndex = pairings.firstIndex(where: { $0.id == pairingId }) {
+                let freshStreak = recomputeStreak(for: pairings[freshIndex])
+                pairings[freshIndex].currentStreak = freshStreak
+                try await db.collection("pairs")
+                    .document(pairingId.uuidString)
+                    .updateData(["currentStreak": freshStreak])
+            }
         } catch {
             errorMessage = "Failed to save check-in for pairing \(pairingId.uuidString): \(error.localizedDescription)"
         }

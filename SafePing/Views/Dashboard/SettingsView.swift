@@ -49,25 +49,6 @@ struct SettingsView: View {
                                 .foregroundColor(.safePingTextMuted)
                         }
                     }
-
-                    Divider().padding(.leading, 52)
-
-                    // Change role — stubbed until role-switching is implemented
-                    SettingsRow(
-                        icon: "arrow.left.arrow.right",
-                        iconColor: .safePingTextMuted,
-                        label: "Change Role"
-                    ) {
-                        HStack(spacing: 4) {
-                            Text("Coming soon")
-                                .font(.system(size: 12))
-                                .foregroundColor(.safePingTextMuted)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12))
-                                .foregroundColor(.safePingBorder)
-                        }
-                    }
-                    .opacity(0.5)
                 }
 
                 // MARK: - Notifications (check-in users only)

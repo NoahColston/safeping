@@ -19,13 +19,20 @@ struct CheckerDashboardView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Top bar
-            HStack {
-                Text("SafePing")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+            HStack(spacing: 0) {
+                Text("Safe")
                     .foregroundColor(.safePingDark)
+
+                Text("Ping")
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.safePingGreenStart, .safePingGreenEnd],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .font(.system(size: 22, weight: .bold, design: .rounded))
             
             if let error = checkInViewModel.errorMessage {
                 Text(error)

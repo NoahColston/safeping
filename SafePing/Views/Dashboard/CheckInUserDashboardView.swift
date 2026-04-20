@@ -20,22 +20,36 @@ struct CheckInUserDashboardView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Top bar
-            HStack {
-                Text("SafePing")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.safePingDark)
+            ZStack {
+                HStack(spacing: 0) {
+                    Text("Safe")
+                        .foregroundColor(.safePingDark)
 
-                Spacer()
-
-                Button(action: { showSettings = true }) {
-                    Circle()
-                        .fill(Color.safePingBorder)
-                        .frame(width: 32, height: 32)
-                        .overlay(
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(.safePingTextMuted)
+                    Text("Ping")
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.safePingGreenStart, .safePingGreenEnd],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
+                }
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+
+                HStack {
+                    Spacer()
+
+                    Button(action: { showPairingCode = true }) {
+                        Circle()
+                            .fill(Color.safePingBorder)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                Image(systemName: "person.badge.plus")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.safePingTextMuted)
+                            )
+                    }
+                    .accessibilityLabel("Add checker")
                 }
             }
             .padding(.horizontal, 20)
