@@ -34,9 +34,11 @@ struct CheckerDashboardView: View {
                 }
                 .font(.system(size: 22, weight: .bold, design: .rounded))
 
-                Text("Hey, \(authViewModel.currentUser?.username ?? "there")!")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundColor(.safePingDark)
+                if selectedTab == 0 {
+                    Text("Hey, \(authViewModel.currentUser?.username ?? "there")!")
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundColor(.safePingDark)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 16)
