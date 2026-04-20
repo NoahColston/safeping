@@ -260,9 +260,7 @@ final class SeedService: ObservableObject {
             }
 
             let dk = dayKey(date)
-            let docID = status == "missed"
-                ? "\(pairing.id)_\(schedule.id)_missed_\(dk)"
-                : "\(pairing.id)_\(schedule.id)_\(dk)"
+            let docID = "\(pairing.id)_\(schedule.id)_\(dk)"
 
             var latitude: Double?
             var longitude: Double?

@@ -23,19 +23,6 @@ struct CheckerDashboardView: View {
                 Text("SafePing")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.safePingDark)
-
-                Spacer()
-
-                Button(action: { showSettings = true }) {
-                    Circle()
-                        .fill(Color.safePingBorder)
-                        .frame(width: 32, height: 32)
-                        .overlay(
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(.safePingTextMuted)
-                        )
-                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
@@ -131,11 +118,6 @@ struct CheckerDashboardView: View {
         }
         .onDisappear {
             checkInViewModel.stopListening()
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-                .environmentObject(authViewModel)
-                .environmentObject(notificationService)
         }
         // Story 12: Sheet to add a new pairing
         .sheet(isPresented: $showAddPairing, onDismiss: {

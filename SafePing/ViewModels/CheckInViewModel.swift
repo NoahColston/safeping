@@ -140,19 +140,79 @@ class CheckInViewModel: ObservableObject {
             }
         }
         
-        // Client-side missed-day backfill (still fires only when checkee opens app)
+        // Client-side missed-day backfill (fires once when checkee opens app).
+        // We fetch existing check-ins with a one-shot getDocuments() BEFORE
+        // running the backfill. This guarantees processMissedDays sees the
+        // real Firestore records rather than racing with the async snapshot
+        // listener whose initial callback hasn't fired yet.
+        //
+        // Both methods use pairing IDs (not array indices) to look up data,
+        // because the pairings array can be mutated by the snapshot listener
+        // while we're suspended on an await.
         if role == .checkInUser {
-            for index in pairings.indices {
-                await processMissedDays(at: index, username: username)
+            let pairingIds = pairings.map { $0.id }
+            for pairingId in pairingIds {
+                await fetchCheckInsOnce(for: pairingId)
+                await processMissedDays(for: pairingId, username: username)
             }
         }
     }
     
+    // MARK: - One-shot check-in fetch (ensures backfill sees real data)
+    /// Performs a single `getDocuments` query to populate check-ins for the
+    /// given pairing. Called before `processMissedDays` so the backfill has
+    /// the actual Firestore records to compare against.
+    private func fetchCheckInsOnce(for pairingId: UUID) async {
+        guard let index = pairings.firstIndex(where: { $0.id == pairingId }) else { return }
+        let pairing = pairings[index]
+        do {
+            let snapshot = try await db.collection("checkIns")
+                .whereField("pairingId", isEqualTo: pairing.id.uuidString)
+                .order(by: "date", descending: true)
+                .limit(to: 365)
+                .getDocuments()
+
+            let checkIns = snapshot.documents.compactMap { doc -> CheckIn? in
+                let data = doc.data()
+                guard
+                    let pairingIdString = data["pairingId"] as? String,
+                    let pairingId = UUID(uuidString: pairingIdString),
+                    let timestamp = data["date"] as? Timestamp,
+                    let statusRaw = data["status"] as? String,
+                    let status = CheckInStatus(rawValue: statusRaw)
+                else { return nil }
+
+                let id = (data["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
+                let scheduleId = (data["scheduleId"] as? String).flatMap(UUID.init(uuidString:))
+
+                return CheckIn(
+                    id: id,
+                    pairingId: pairingId,
+                    scheduleId: scheduleId,
+                    date: timestamp.dateValue(),
+                    status: status,
+                    latitude: data["latitude"] as? Double,
+                    longitude: data["longitude"] as? Double
+                )
+            }
+
+            // Re-lookup index after the await — the array may have shifted.
+            guard let freshIndex = pairings.firstIndex(where: { $0.id == pairingId }) else { return }
+            pairings[freshIndex].checkIns = checkIns
+            pairings[freshIndex].currentStreak = recomputeStreak(for: pairings[freshIndex])
+        } catch {
+            // Non-fatal: if the fetch fails the listener will deliver data
+            // eventually, and backfill will run against whatever is in memory.
+            print("fetchCheckInsOnce failed for pairing \(pairingId.uuidString): \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Process missed days on app foreground
-    private func processMissedDays(at index: Int, username: String) async {
+    private func processMissedDays(for pairingId: UUID, username: String) async {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return }
+        guard let index = pairings.firstIndex(where: { $0.id == pairingId }) else { return }
 
         let pairing = pairings[index]
         
@@ -188,15 +248,21 @@ class CheckInViewModel: ObservableObject {
 
         guard !newCheckIns.isEmpty else { return }
 
-        pairings[index].checkIns.append(contentsOf: newCheckIns)
-        let newStreak = recomputeStreak(for: pairings[index])
-        pairings[index].currentStreak = newStreak
+        // Re-lookup index after the guard — safe before the await below.
+        guard let freshIndex = pairings.firstIndex(where: { $0.id == pairingId }) else { return }
+        pairings[freshIndex].checkIns.append(contentsOf: newCheckIns)
+        let newStreak = recomputeStreak(for: pairings[freshIndex])
+        pairings[freshIndex].currentStreak = newStreak
 
         do {
             for ci in newCheckIns {
                 let dayKey = Int(ci.date.timeIntervalSince1970)
                 let scheduleKey = ci.scheduleId?.uuidString ?? "legacy"
-                let docId = "\(pairing.id.uuidString)_\(scheduleKey)_missed_\(dayKey)"
+                let canonicalDocId = "\(pairing.id.uuidString)_\(scheduleKey)_\(dayKey)"
+
+                let existing = try await db.collection("checkIns").document(canonicalDocId).getDocument()
+                guard !existing.exists else { continue }
+
                 let data: [String: Any] = [
                     "id": ci.id.uuidString,
                     "pairingId": pairing.id.uuidString,
@@ -205,11 +271,16 @@ class CheckInViewModel: ObservableObject {
                     "date": Timestamp(date: ci.date),
                     "status": CheckInStatus.missed.rawValue
                 ]
-                try await db.collection("checkIns").document(docId).setData(data)
+                try await db.collection("checkIns").document(canonicalDocId).setData(data)
             }
-            try await db.collection("pairs")
-                .document(pairing.id.uuidString)
-                .updateData(["currentStreak": newStreak])
+            // Re-lookup after the await loop for the streak update.
+            if let idx = pairings.firstIndex(where: { $0.id == pairingId }) {
+                let streak = recomputeStreak(for: pairings[idx])
+                pairings[idx].currentStreak = streak
+                try await db.collection("pairs")
+                    .document(pairing.id.uuidString)
+                    .updateData(["currentStreak": streak])
+            }
         } catch {
             errorMessage = "Failed to record missed days for pairing \(pairing.id.uuidString): \(error.localizedDescription)"
         }
