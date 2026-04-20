@@ -1,6 +1,5 @@
 // SafePing — CheckeeLocationView.swift
-// Shows the check-in user's last known location on a map for the checker.
-// [OOP] Reads location data from the Pairing model stored in CheckInViewModel.
+// Shows the check-in user's LAST known location on a map for the checker.
 
 import SwiftUI
 import MapKit
@@ -8,65 +7,49 @@ import MapKit
 struct CheckeeLocationView: View {
     let pairing: Pairing
 
-    @State private var selectedCheckIn: CheckIn?
     @State private var position: MapCameraPosition = .automatic
 
-    private var locationCheckIns: [CheckIn] {
+    private var lastCheckIn: CheckIn? {
         pairing.checkIns
             .filter { $0.latitude != nil && $0.longitude != nil }
             .sorted { $0.date > $1.date }
+            .first
     }
 
     var body: some View {
-        if locationCheckIns.isEmpty {
-            emptyState
-        } else {
+        if let ci = lastCheckIn, let lat = ci.latitude, let lon = ci.longitude {
+            let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
             VStack(spacing: 0) {
                 Map(position: $position) {
-                    ForEach(locationCheckIns) { ci in
-                        if let lat = ci.latitude, let lon = ci.longitude {
-                            Annotation("", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon)) {
-                                pinView(for: ci)
-                                    .onTapGesture {
-                                        withAnimation { selectedCheckIn = ci }
-                                    }
-                            }
-                        }
+                    Annotation("", coordinate: coord) {
+                        pinView(for: ci)
                     }
                 }
                 .frame(maxHeight: .infinity)
-
-                if let ci = selectedCheckIn ?? locationCheckIns.first {
-                    detailBar(for: ci)
-                }
-            }
-            .onAppear {
-                if let ci = locationCheckIns.first,
-                   let lat = ci.latitude, let lon = ci.longitude {
+                .onAppear {
                     position = .region(MKCoordinateRegion(
-                        center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+                        center: coord,
                         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
                     ))
                 }
+
+                detailBar(for: ci)
             }
+        } else {
+            emptyState
         }
     }
 
-    @ViewBuilder
     private func pinView(for ci: CheckIn) -> some View {
-        let isSelected = selectedCheckIn?.id == ci.id
         ZStack {
             Circle()
                 .fill(ci.status == .checkedIn ? Color.safePingGreenMid : Color.safePingError)
-                .frame(width: isSelected ? 18 : 12, height: isSelected ? 18 : 12)
+                .frame(width: 18, height: 18)
                 .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-            if isSelected {
-                Circle()
-                    .stroke(Color.white, lineWidth: 2)
-                    .frame(width: 18, height: 18)
-            }
+            Circle()
+                .stroke(Color.white, lineWidth: 2)
+                .frame(width: 18, height: 18)
         }
-        .animation(.spring(response: 0.3), value: isSelected)
     }
 
     private func detailBar(for ci: CheckIn) -> some View {
@@ -81,7 +64,7 @@ struct CheckeeLocationView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(ci.status == .checkedIn ? "Checked in" : "Missed")
+                Text(ci.status == .checkedIn ? "Last check-in" : "Last missed")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.safePingDark)
                 Text(formattedDate(ci.date))
@@ -90,10 +73,6 @@ struct CheckeeLocationView: View {
             }
 
             Spacer()
-
-            Text("\(locationCheckIns.count) pinned")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.safePingTextMuted)
         }
         .padding(16)
         .background(Color.white)
@@ -109,7 +88,7 @@ struct CheckeeLocationView: View {
             Image(systemName: "location.slash.fill")
                 .font(.system(size: 48))
                 .foregroundColor(.safePingTextMuted)
-            Text("No location history")
+            Text("No location yet")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.safePingDark)
             Text("Your check-in locations will appear here once you allow location access and check in.")

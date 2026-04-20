@@ -18,21 +18,28 @@ struct CheckerDashboardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top bar
-            HStack(spacing: 0) {
-                Text("Safe")
-                    .foregroundColor(.safePingDark)
+            VStack(spacing: 8) {
+                HStack(spacing: 0) {
+                    Text("Safe")
+                        .foregroundColor(.safePingDark)
 
-                Text("Ping")
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.safePingGreenStart, .safePingGreenEnd],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                    Text("Ping")
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.safePingGreenStart, .safePingGreenEnd],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
+                }
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+
+                Text("Hey, \(authViewModel.currentUser?.username ?? "there")!")
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundColor(.safePingDark)
             }
-            .font(.system(size: 22, weight: .bold, design: .rounded))
+            .frame(maxWidth: .infinity)
+            .padding(.top, 16)
             
             if let error = checkInViewModel.errorMessage {
                 Text(error)

@@ -145,9 +145,25 @@ private struct ScheduleRow: View {
 
                     Spacer()
 
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.safePingTextMuted)
+                    if isExpanded {
+                        Text("Done")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(
+                                LinearGradient(
+                                    colors: [.safePingGreenStart, .safePingGreenEnd],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(8)
+                    } else {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.safePingTextMuted)
+                    }
                 }
             }
             .buttonStyle(.plain)
