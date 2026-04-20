@@ -116,9 +116,6 @@ struct CheckerDashboardView: View {
                 }
             }
         }
-        .onDisappear {
-            checkInViewModel.stopListening()
-        }
         // Story 12: Sheet to add a new pairing
         .sheet(isPresented: $showAddPairing, onDismiss: {
             if let user = authViewModel.currentUser {

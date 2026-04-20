@@ -21,6 +21,10 @@ class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     // the iOS Settings deep link when access is denied.
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
 
+    // Used for the async captureLocationAsync() wrapper.
+    // Set before requestLocation()
+    private var locationContinuation: CheckedContinuation<CLLocation?, Never>?
+
     override init() {
         super.init()
         manager.delegate = self
@@ -54,15 +58,29 @@ class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
         manager.requestLocation()
     }
 
+    // Async wrapper for `captureLocation`.
+    // Returns nil if permission is denied or the GPS fix fails.
+    func captureLocationAsync() async -> CLLocation? {
+        guard hasPermission else { return nil }
+        return await withCheckedContinuation { continuation in
+            locationContinuation = continuation
+            manager.requestLocation()
+        }
+    }
+
     // MARK: - CLLocationManagerDelegate
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         currentLocation = locations.last
+        locationContinuation?.resume(returning: locations.last)
+        locationContinuation = nil
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // Non-fatal — check-in proceeds without location if a fix can't be obtained.
         print("LocationService: failed to get location — \(error.localizedDescription)")
+        locationContinuation?.resume(returning: nil)
+        locationContinuation = nil
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

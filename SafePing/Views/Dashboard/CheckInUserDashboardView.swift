@@ -159,9 +159,6 @@ struct CheckInUserDashboardView: View {
                 }
             }
         }
-        .onDisappear {
-                    checkInViewModel.stopListening()
-        }
         .onChange(of: pairingsFingerprint) { _, _ in
             guard let username = authViewModel.currentUser?.username else { return }
             notificationService.scheduleAllReminders(
@@ -342,14 +339,13 @@ struct CheckInUserDashboardView: View {
     }
 
     private func performCheckIn(scheduleId: UUID) {
-        locationService.captureLocation()
-        let coordinate = locationService.currentLocation?.coordinate
         let pairingId = checkInViewModel.selectedPairing?.id
         Task {
+            let location = await locationService.captureLocationAsync()
             await checkInViewModel.performCheckIn(
                 username: authViewModel.currentUser?.username ?? "",
                 scheduleId: scheduleId,
-                location: coordinate
+                location: location?.coordinate
             )
             notificationService.simulateCheckerAlert(
                 checkeeName: authViewModel.currentUser?.username ?? "User"
