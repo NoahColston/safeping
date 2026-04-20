@@ -182,12 +182,17 @@ struct SettingsView: View {
                             iconColor: .safePingError,
                             label: "Delete Account"
                         ) {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13))
-                                .foregroundColor(.safePingBorder)
+                            if authViewModel.isDeleting {
+                                ProgressView().scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.safePingBorder)
+                            }
                         }
                     }
                     .buttonStyle(.plain)
+                    .disabled(authViewModel.isDeleting)
                 }
 
                 Spacer().frame(height: 16)
@@ -202,7 +207,10 @@ struct SettingsView: View {
             titleVisibility: .visible
         ) {
             Button("Delete Account", role: .destructive) {
-                // TODO: implement account deletion
+                Task {
+                    notificationService.cancelAllNotifications()
+                    await authViewModel.deleteAccount()
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {

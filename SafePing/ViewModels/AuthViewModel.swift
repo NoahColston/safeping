@@ -253,6 +253,73 @@ class AuthViewModel: ObservableObject {
         pairingComplete = false
     }
 
+    // MARK: - Delete Account
+    // Permanently removes the user's Firestore data and local state.
+    // Deletes: user document, all pairings (as checker or check-in user),
+    // all check-ins tied to those pairings, and any unused pairing codes.
+    @Published var isDeleting = false
+
+    func deleteAccount() async {
+        guard let user = currentUser else { return }
+        let username = user.username
+        isDeleting = true
+        errorMessage = nil
+
+        do {
+            // Find all pairings where this user is either side
+            let asChecker = try await db.collection("pairs")
+                .whereField("checkerUsername", isEqualTo: username)
+                .getDocuments()
+            let asCheckIn = try await db.collection("pairs")
+                .whereField("checkInUsername", isEqualTo: username)
+                .getDocuments()
+
+            let allPairDocs = asChecker.documents + asCheckIn.documents
+            let pairingIds = allPairDocs.map { $0.documentID }
+
+            // Delete all check-ins for each pairing
+            for pairingId in pairingIds {
+                let checkInDocs = try await db.collection("checkIns")
+                    .whereField("pairingId", isEqualTo: pairingId)
+                    .getDocuments()
+
+                for doc in checkInDocs.documents {
+                    try await doc.reference.delete()
+                }
+            }
+
+            // Delete all pairing documents
+            for doc in allPairDocs {
+                try await doc.reference.delete()
+            }
+
+            // Delete any pairing codes they generated
+            let codes = try await db.collection("pairingCodes")
+                .whereField("checkeeUsername", isEqualTo: username)
+                .getDocuments()
+            for doc in codes.documents {
+                try await doc.reference.delete()
+            }
+
+            // Delete the user document
+            try await db.collection(usersCollection).document(username).delete()
+
+            // Clear local state
+            stopPairsListener()
+            UserDefaults.standard.removeObject(forKey: "pairingComplete_\(username)")
+            UserDefaults.standard.removeObject(forKey: "onboardingComplete_\(username)")
+            UserDefaults.standard.removeObject(forKey: "currentUsername")
+            currentUser = nil
+            isAuthenticated = false
+            onboardingComplete = false
+            pairingComplete = false
+            isDeleting = false
+        } catch {
+            errorMessage = "Failed to delete account: \(error.localizedDescription)"
+            isDeleting = false
+        }
+    }
+
     // MARK: - Firestore Helpers
     private func userToFirestore(_ user: User) -> [String: Any] {
         var data: [String: Any] = [
