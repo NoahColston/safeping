@@ -162,6 +162,7 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
                     let fireMinute = (schedule.minute + schedule.gracePeriodMinutes) % 60
                     let extraHours = (schedule.minute + schedule.gracePeriodMinutes) / 60
                     let fireHour = (schedule.hour + extraHours) % 24
+                    let crossesMidnight = (schedule.hour + extraHours) >= 24
 
                     if schedule.frequency == .daily {
                         var components = DateComponents()
@@ -173,10 +174,13 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
                         try? await UNUserNotificationCenter.current().add(request)
                     } else {
                         for weekday in schedule.activeDays {
+                            let adjustedWeekday = crossesMidnight
+                                ? (weekday % 7) + 1
+                                : weekday
                             var components = DateComponents()
                             components.hour = fireHour
                             components.minute = fireMinute
-                            components.weekday = weekday
+                            components.weekday = adjustedWeekday
                             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
                             let identifier = "\(NotificationService.escalationRequestPrefix)\(pairing.id.uuidString)-\(schedule.id.uuidString)-w\(weekday)"
                             let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
