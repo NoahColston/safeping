@@ -58,12 +58,21 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
+            BlueprintIdentifier = "C798FA072F96F1B3000E3F35"
+            BuildableName = "SafePing Watch App.app"
+            BlueprintName = "SafePing Watch App"
+            ReferencedContainer = "container:SafePing.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
             BlueprintIdentifier = "C798FA1D2F96F691000E3F35"
             BuildableName = "SafePing Watch App Watch App.app"
             BlueprintName = "SafePing Watch App Watch App"
             ReferencedContainer = "container:SafePing.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
+      </MacroExpansion>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -81,6 +90,15 @@
             ReferencedContainer = "container:SafePing.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "C798FA1D2F96F691000E3F35"
+            BuildableName = "SafePing Watch App Watch App.app"
+            BlueprintName = "SafePing Watch App Watch App"
+            ReferencedContainer = "container:SafePing.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">
