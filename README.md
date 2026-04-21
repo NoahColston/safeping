@@ -1,10 +1,10 @@
 # SafePing
 
-SafePing is a mobile application that provides structured, customizable safety check-ins with automatic escalation. Users schedule recurring check-ins, and if a check-in is missed within a configured grace window, designated contacts are automatically notified.
+SafePing is a mobile application that provides structured, customizable safety check ins with automatic escalation. Users schedule recurring check-ins, and if a check in is missed within a configured grace window, designated contacts are automatically notified.
 
 ## Features
 
-- Scheduled safety check-ins with flexible recurrence options  
+- Scheduled safety check ins with flexible recurrence options  
 - Custom check in messages per schedule  
 - Grace period based failure detection  
 - Automatic escalation notifications to designated contacts  
@@ -17,7 +17,7 @@ SafePing is a mobile application that provides structured, customizable safety c
 - Swift / SwiftUI  
 - iOS location services  
 - Notification system
-- Core data models for users, pairings, and check-ins  
+- Core data models for users, pairings, and check ins  
 
 ## Setup Instructions
 
