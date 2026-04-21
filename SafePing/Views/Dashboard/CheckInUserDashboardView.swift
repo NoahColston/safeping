@@ -9,11 +9,11 @@ struct CheckInUserDashboardView: View {
     @StateObject private var checkInViewModel = CheckInViewModel()
     @EnvironmentObject var notificationService: NotificationService
     @EnvironmentObject var locationService: LocationService
+    @EnvironmentObject var watchConnectivity: WatchConnectivityService
     @StateObject private var pairingViewModel = PairingViewModel()
     @State private var pulsingScheduleId: UUID?
     @State private var showPairingCode = false
     @State private var selectedTab = 0
-    @State private var showSettings = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -162,6 +162,9 @@ struct CheckInUserDashboardView: View {
                             for: checkInViewModel.pairings,
                             username: user.username
                         )
+                        watchConnectivity.sendNextCheckInToWatch(
+                            pairings: checkInViewModel.pairings
+                        )
                     }
                 }
             }
@@ -176,6 +179,7 @@ struct CheckInUserDashboardView: View {
                 for: checkInViewModel.pairings,
                 username: username
             )
+            watchConnectivity.sendNextCheckInToWatch(pairings: checkInViewModel.pairings)
         }
         .onChange(of: checkInViewModel.selectedPairing?.id) { _, newValue in
             guard newValue == nil, let username = authViewModel.currentUser?.username else { return }
@@ -183,12 +187,6 @@ struct CheckInUserDashboardView: View {
             Task {
                 await pairingViewModel.generateCode(for: username)
             }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-                .environmentObject(authViewModel)
-                .environmentObject(notificationService)
-                .environmentObject(locationService)
         }
         // Story 12: Sheet to generate a new pairing code for another checker
         .sheet(isPresented: $showPairingCode) {
@@ -600,4 +598,5 @@ struct GetPairingCodeSheet: View {
         .environmentObject(vm)
         .environmentObject(NotificationService())
         .environmentObject(LocationService())
+        .environmentObject(WatchConnectivityService())
 }

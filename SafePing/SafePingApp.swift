@@ -11,6 +11,7 @@ struct SafePingApp: App {
     @StateObject private var notificationService = NotificationService()
     @StateObject private var authViewModel = AuthViewModel()
     @StateObject private var locationService = LocationService()
+    @StateObject private var watchConnectivity = WatchConnectivityService()
 
     init() {
         FirebaseApp.configure()
@@ -22,6 +23,7 @@ struct SafePingApp: App {
                 .environmentObject(authViewModel)
                 .environmentObject(notificationService)
                 .environmentObject(locationService)
+                .environmentObject(watchConnectivity)
         }
     }
 }

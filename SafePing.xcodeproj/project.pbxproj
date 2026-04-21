@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B0C3747E2F6EE7140078733A /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B0C3747D2F6EE7140078733A /* FirebaseFirestore */; };
+		C798FA152F96F1BA000E3F35 /* SafePing Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = C798FA082F96F1B3000E3F35 /* SafePing Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,12 +26,34 @@
 			remoteGlobalIDString = C7798AF32F58AF590076110A;
 			remoteInfo = SafePing;
 		};
+		C798FA132F96F1BA000E3F35 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C7798AEC2F58AF590076110A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C798FA072F96F1B3000E3F35;
+			remoteInfo = "SafePing Watch App Watch App";
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C798FA192F96F1BA000E3F35 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				C798FA152F96F1BA000E3F35 /* SafePing Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		C7798AF42F58AF5A0076110A /* SafePing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SafePing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C7798B042F58AF5E0076110A /* SafePingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SafePingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C7798B0E2F58AF5F0076110A /* SafePingUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SafePingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C798FA082F96F1B3000E3F35 /* SafePing Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SafePing Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -47,6 +70,11 @@
 		C7798B112F58AF5F0076110A /* SafePingUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SafePingUITests;
+			sourceTree = "<group>";
+		};
+		C798FA092F96F1B4000E3F35 /* SafePingWatchApp */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SafePingWatchApp;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -74,6 +102,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C798FA052F96F1B3000E3F35 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -90,6 +125,7 @@
 				C7798AF62F58AF5A0076110A /* SafePing */,
 				C7798B072F58AF5E0076110A /* SafePingTests */,
 				C7798B112F58AF5F0076110A /* SafePingUITests */,
+				C798FA092F96F1B4000E3F35 /* SafePingWatchApp */,
 				B0C3747C2F6EE7140078733A /* Frameworks */,
 				C7798AF52F58AF5A0076110A /* Products */,
 			);
@@ -101,6 +137,7 @@
 				C7798AF42F58AF5A0076110A /* SafePing.app */,
 				C7798B042F58AF5E0076110A /* SafePingTests.xctest */,
 				C7798B0E2F58AF5F0076110A /* SafePingUITests.xctest */,
+				C798FA082F96F1B3000E3F35 /* SafePing Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -115,10 +152,12 @@
 				C7798AF02F58AF590076110A /* Sources */,
 				C7798AF12F58AF590076110A /* Frameworks */,
 				C7798AF22F58AF590076110A /* Resources */,
+				C798FA192F96F1BA000E3F35 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C798FA142F96F1BA000E3F35 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C7798AF62F58AF5A0076110A /* SafePing */,
@@ -177,6 +216,28 @@
 			productReference = C7798B0E2F58AF5F0076110A /* SafePingUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		C798FA072F96F1B3000E3F35 /* SafePing Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C798FA162F96F1BA000E3F35 /* Build configuration list for PBXNativeTarget "SafePing Watch App" */;
+			buildPhases = (
+				C798FA042F96F1B3000E3F35 /* Sources */,
+				C798FA052F96F1B3000E3F35 /* Frameworks */,
+				C798FA062F96F1B3000E3F35 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C798FA092F96F1B4000E3F35 /* SafePingWatchApp */,
+			);
+			name = "SafePing Watch App";
+			packageProductDependencies = (
+			);
+			productName = "SafePing Watch App Watch App";
+			productReference = C798FA082F96F1B3000E3F35 /* SafePing Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -197,6 +258,10 @@
 					C7798B0D2F58AF5F0076110A = {
 						CreatedOnToolsVersion = 16.2;
 						TestTargetID = C7798AF32F58AF590076110A;
+					};
+					C798FA072F96F1B3000E3F35 = {
+						CreatedOnToolsVersion = 16.2;
+						LastSwiftMigration = 1620;
 					};
 				};
 			};
@@ -220,6 +285,7 @@
 				C7798AF32F58AF590076110A /* SafePing */,
 				C7798B032F58AF5E0076110A /* SafePingTests */,
 				C7798B0D2F58AF5F0076110A /* SafePingUITests */,
+				C798FA072F96F1B3000E3F35 /* SafePing Watch App */,
 			);
 		};
 /* End PBXProject section */
@@ -240,6 +306,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C7798B0C2F58AF5F0076110A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C798FA062F96F1B3000E3F35 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -270,6 +343,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C798FA042F96F1B3000E3F35 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -282,6 +362,11 @@
 			isa = PBXTargetDependency;
 			target = C7798AF32F58AF590076110A /* SafePing */;
 			targetProxy = C7798B0F2F58AF5F0076110A /* PBXContainerItemProxy */;
+		};
+		C798FA142F96F1BA000E3F35 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C798FA072F96F1B3000E3F35 /* SafePing Watch App */;
+			targetProxy = C798FA132F96F1BA000E3F35 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -414,7 +499,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SafePing/Preview Content\"";
-				DEVELOPMENT_TEAM = 73DQWPP2RC;
+				DEVELOPMENT_TEAM = 7QXP9SKRG7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -444,7 +529,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SafePing/Preview Content\"";
-				DEVELOPMENT_TEAM = 73DQWPP2RC;
+				DEVELOPMENT_TEAM = 7QXP9SKRG7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -533,6 +618,69 @@
 			};
 			name = Release;
 		};
+		C798FA172F96F1BA000E3F35 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"SafePingWatchApp/Preview Content\"";
+				DEVELOPMENT_TEAM = 7QXP9SKRG7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "SafePing Watch App";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = MobileSoftware.SafePing;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = MobileSoftware.SafePing.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Debug;
+		};
+		C798FA182F96F1BA000E3F35 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"SafePingWatchApp/Preview Content\"";
+				DEVELOPMENT_TEAM = 7QXP9SKRG7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "SafePing Watch App";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = MobileSoftware.SafePing;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = MobileSoftware.SafePing.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -568,6 +716,15 @@
 			buildConfigurations = (
 				C7798B1F2F58AF5F0076110A /* Debug */,
 				C7798B202F58AF5F0076110A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C798FA162F96F1BA000E3F35 /* Build configuration list for PBXNativeTarget "SafePing Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C798FA172F96F1BA000E3F35 /* Debug */,
+				C798FA182F96F1BA000E3F35 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
