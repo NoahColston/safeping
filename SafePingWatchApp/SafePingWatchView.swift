@@ -15,13 +15,14 @@ class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
     @Published var resultMessage: String?
     @Published var isSending = false
 
-    /// True when the phone has sent a scheduled time (not a "no schedules" message).
+    /// True when the phone has sent a scheduled time (not a status message).
     var canCheckIn: Bool {
         guard !isSending else { return false }
         // Only allow check-in if we have an actual time string from the phone.
         let noCheckInPhrases = [
             "Open SafePing on your iPhone to sync",
             "No check-ins scheduled",
+            "All done for today",
             "Phone not reachable"
         ]
         return !noCheckInPhrases.contains(nextCheckIn)

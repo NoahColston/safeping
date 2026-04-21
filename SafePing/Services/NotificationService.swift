@@ -263,11 +263,13 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
                         var components = calendar.dateComponents([.year, .month, .day], from: today)
                         components.hour = schedule.hour
                         components.minute = schedule.minute
-                        if let scheduledTime = calendar.date(from: components),
-                           let earliest = calendar.date(byAdding: .minute, value: -15, to: scheduledTime),
-                           today < earliest {
-                            // Too early — silently skip
-                            return
+                        if let scheduledTime = calendar.date(from: components) {
+                            let earliest = calendar.date(byAdding: .minute, value: -15, to: scheduledTime)!
+                            let latest = calendar.date(byAdding: .minute, value: schedule.gracePeriodMinutes, to: scheduledTime)!
+                            if today < earliest || today > latest {
+                                // Outside check-in window — silently skip
+                                return
+                            }
                         }
                     }
                 }

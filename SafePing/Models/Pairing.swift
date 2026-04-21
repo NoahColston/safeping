@@ -312,7 +312,8 @@ struct Pairing: Identifiable, Codable {
         return (lat, lon)
     }
     
-    // Next upcoming scheduled time across all schedules.
+    // Next upcoming scheduled time across all schedules that has not
+    // already been checked in. Returns nil when all slots are done.
     var nextScheduledOccurrence: Date? {
         let calendar = Calendar.current
         let now = Date()
@@ -327,6 +328,10 @@ struct Pairing: Identifiable, Codable {
                 components.minute = schedule.minute
                 guard let occurrence = calendar.date(from: components) else { continue }
                 if occurrence > now {
+                    // Skip this slot if it's already checked in for that day
+                    if status(for: day, scheduleId: schedule.id) == .checkedIn {
+                        continue
+                    }
                     candidates.append(occurrence)
                     break
                 }

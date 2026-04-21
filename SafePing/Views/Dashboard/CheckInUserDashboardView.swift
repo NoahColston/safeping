@@ -361,6 +361,8 @@ struct CheckInUserDashboardView: View {
                     scheduleId: scheduleId
                 )
             }
+            // Update the watch with the next remaining slot
+            watchConnectivity.sendNextCheckInToWatch(pairings: checkInViewModel.pairings)
         }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
             pulsingScheduleId = scheduleId
@@ -424,10 +426,26 @@ private struct TodaySlotRow: View {
 
     private var alreadyCheckedIn: Bool { status == .checkedIn }
     private var wasMissed: Bool { status == .missed }
-    private var tooEarly: Bool { !alreadyCheckedIn && !wasMissed && !isAvailable }
+
+    /// True when the grace period has passed and no check-in was recorded.
+    /// Covers today's slots that haven't been backfilled as .missed yet.
+    private var isExpired: Bool {
+        guard !alreadyCheckedIn && !wasMissed else { return false }
+        let now = Date()
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: now)
+        components.hour = schedule.hour
+        components.minute = schedule.minute
+        guard let scheduledTime = calendar.date(from: components) else { return false }
+        let deadline = calendar.date(byAdding: .minute, value: schedule.gracePeriodMinutes, to: scheduledTime)!
+        return now > deadline
+    }
+
+    private var showAsMissed: Bool { wasMissed || isExpired }
+    private var tooEarly: Bool { !alreadyCheckedIn && !showAsMissed && !isAvailable }
 
     var body: some View {
-        Button(action: { if !alreadyCheckedIn { onCheckIn() } }) {
+        Button(action: { if !alreadyCheckedIn && !showAsMissed { onCheckIn() } }) {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
@@ -449,7 +467,7 @@ private struct TodaySlotRow: View {
 
                 Spacer()
 
-                if !alreadyCheckedIn {
+                if !alreadyCheckedIn && !showAsMissed {
                     Text(tooEarly ? "Opens \(opensAt)" : "Check In")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
@@ -469,6 +487,14 @@ private struct TodaySlotRow: View {
                             )
                         )
                         .cornerRadius(10)
+                } else if showAsMissed {
+                    Text("Missed")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.safePingError)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.safePingErrorBg)
+                        .cornerRadius(10)
                 }
             }
             .padding(12)
@@ -477,38 +503,40 @@ private struct TodaySlotRow: View {
             .scaleEffect(isPulsing ? 1.03 : 1.0)
         }
         .buttonStyle(.plain)
-        .disabled(alreadyCheckedIn || tooEarly)
+        .disabled(alreadyCheckedIn || showAsMissed || tooEarly)
     }
 
     private var subtitle: String {
         if alreadyCheckedIn { return "Done · \(checkerUsername) notified" }
-        if wasMissed { return "Missed · \(schedule.formattedTime)" }
+        if showAsMissed { return "Missed · \(schedule.formattedTime)" }
         if tooEarly { return "Available at \(opensAt)" }
         return schedule.formattedTime
     }
 
     private var iconName: String {
         if alreadyCheckedIn { return "checkmark.circle.fill" }
-        if wasMissed { return "exclamationmark.circle.fill" }
+        if showAsMissed { return "exclamationmark.circle.fill" }
         if tooEarly { return "lock.fill" }
         return "clock.fill"
     }
 
     private var iconColor: Color {
         if alreadyCheckedIn { return .safePingGreenEnd }
-        if wasMissed { return .safePingError }
+        if showAsMissed { return .safePingError }
         if tooEarly { return .safePingTextMuted }
         return .safePingGreenMid
     }
 
     private var iconBackground: Color {
         if alreadyCheckedIn { return Color.safePingSuccessBg }
-        if wasMissed { return Color.safePingErrorBg }
+        if showAsMissed { return Color.safePingErrorBg }
         return Color.safePingGreenMid.opacity(0.12)
     }
 
     private var rowBackground: Color {
-        alreadyCheckedIn ? Color.safePingSuccessBg.opacity(0.6) : Color.safePingBg.opacity(0.5)
+        if alreadyCheckedIn { return Color.safePingSuccessBg.opacity(0.6) }
+        if showAsMissed { return Color.safePingErrorBg.opacity(0.4) }
+        return Color.safePingBg.opacity(0.5)
     }
 }
 

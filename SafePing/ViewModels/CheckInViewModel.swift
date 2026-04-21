@@ -516,7 +516,7 @@ class CheckInViewModel: ObservableObject {
         else { return }
         let today = Date()
         
-        // reject check-ins more than 15 minutes before scheduled time
+        // reject check-ins outside the allowed window
         if let schedule = pairings[index].schedules.first(where: { $0.id == scheduleId }) {
             let calendar = Calendar.current
             var components = calendar.dateComponents([.year, .month, .day], from: today)
@@ -524,8 +524,13 @@ class CheckInViewModel: ObservableObject {
             components.minute = schedule.minute
             if let scheduledTime = calendar.date(from: components) {
                 let earliestAllowed = calendar.date(byAdding: .minute, value: -15, to: scheduledTime)!
+                let latestAllowed = calendar.date(byAdding: .minute, value: schedule.gracePeriodMinutes, to: scheduledTime)!
                 if today < earliestAllowed {
                     errorMessage = "Too early — check-in opens at \(CheckInViewModel.formatTime(earliestAllowed))."
+                    return
+                }
+                if today > latestAllowed {
+                    errorMessage = "This check-in window has closed."
                     return
                 }
             }
@@ -572,7 +577,7 @@ class CheckInViewModel: ObservableObject {
 
             try await db.collection("checkIns").document(docId).setData(data)
 
-            // Re-lookup after await in case the array shifted
+            // Re-lookup after await — the array may have shifted.
             if let freshIndex = pairings.firstIndex(where: { $0.id == pairingId }) {
                 let freshStreak = recomputeStreak(for: pairings[freshIndex])
                 pairings[freshIndex].currentStreak = freshStreak

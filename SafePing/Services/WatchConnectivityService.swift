@@ -11,6 +11,10 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
 
     private let db = Firestore.firestore()
 
+    /// Cached pairings so we can re-send to the watch when it becomes
+    /// reachable without needing the dashboard to be on screen.
+    private var cachedPairings: [Pairing] = []
+
     override init() {
         super.init()
         if WCSession.isSupported() {
@@ -25,10 +29,16 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
     /// an up-to-date countdown. Safe to call when the watch is not
     /// reachable — the message is silently dropped.
     func sendNextCheckInToWatch(pairings: [Pairing]) {
+        cachedPairings = pairings
+        pushNextCheckIn()
+    }
+
+    /// Sends the cached next check-in time to the watch.
+    private func pushNextCheckIn() {
         guard WCSession.default.isReachable else { return }
 
         // Find the earliest upcoming scheduled time across all pairings.
-        let nextTimes = pairings.compactMap { $0.nextScheduledOccurrence }
+        let nextTimes = cachedPairings.compactMap { $0.nextScheduledOccurrence }
         guard let earliest = nextTimes.min() else {
             WCSession.default.sendMessage(
                 ["nextCheckIn": "No check-ins scheduled"],
@@ -50,6 +60,14 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
             replyHandler: nil,
             errorHandler: nil
         )
+    }
+
+    // MARK: - Watch became reachable — push latest data
+
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        if session.isReachable {
+            pushNextCheckIn()
+        }
     }
 
     // MARK: - Receive check-in from watch
@@ -114,9 +132,10 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
                     components.minute = schedule.minute
                     guard let scheduledTime = calendar.date(from: components) else { continue }
 
-                    // Must be within the check-in window (no earlier than 15 min before)
+                    // Check-in window: 15 min before scheduled time → scheduled time + grace period
                     let earliestAllowed = calendar.date(byAdding: .minute, value: -15, to: scheduledTime)!
-                    guard now >= earliestAllowed else { continue }
+                    let latestAllowed = calendar.date(byAdding: .minute, value: schedule.gracePeriodMinutes, to: scheduledTime)!
+                    guard now >= earliestAllowed && now <= latestAllowed else { continue }
 
                     // Check if already checked in for this slot today
                     let dayKey = Int(calendar.startOfDay(for: now).timeIntervalSince1970)
@@ -145,12 +164,78 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
             }
 
             if checkedInCount > 0 {
+                await pushNextCheckInAfterWatchAction(username: username)
                 return "Checked in! (\(checkedInCount) slot\(checkedInCount == 1 ? "" : "s"))"
             } else {
                 return "No slots available right now"
             }
         } catch {
             return "Error: \(error.localizedDescription)"
+        }
+    }
+
+    /// After a watch-initiated check-in, compute the next unchecked slot
+    /// and send it to the watch directly from Firestore data.
+    private func pushNextCheckInAfterWatchAction(username: String) async {
+        guard WCSession.default.isReachable else { return }
+        let calendar = Calendar.current
+        let now = Date()
+
+        do {
+            let pairsSnapshot = try await db.collection("pairs")
+                .whereField("checkInUsername", isEqualTo: username)
+                .getDocuments()
+
+            var candidates: [Date] = []
+
+            for pairDoc in pairsSnapshot.documents {
+                let pairData = pairDoc.data()
+                let pairingId = pairDoc.documentID
+                guard let schedulesArr = pairData["schedules"] as? [[String: Any]] else { continue }
+                let schedules = schedulesArr.map { CheckInSchedule.fromFirestore($0) }
+
+                for schedule in schedules {
+                    for offset in 0...7 {
+                        guard let day = calendar.date(byAdding: .day, value: offset, to: now) else { continue }
+                        let weekday = calendar.component(.weekday, from: day)
+                        guard schedule.isScheduled(weekday: weekday) else { continue }
+                        var components = calendar.dateComponents([.year, .month, .day], from: day)
+                        components.hour = schedule.hour
+                        components.minute = schedule.minute
+                        guard let occurrence = calendar.date(from: components), occurrence > now else { continue }
+
+                        // Check if already checked in for this slot
+                        let dayKey = Int(calendar.startOfDay(for: day).timeIntervalSince1970)
+                        let docId = "\(pairingId)_\(schedule.id.uuidString)_\(dayKey)"
+                        let existing = try await db.collection("checkIns").document(docId).getDocument()
+                        if let data = existing.data(),
+                           let status = data["status"] as? String,
+                           status == CheckInStatus.checkedIn.rawValue {
+                            continue
+                        }
+
+                        candidates.append(occurrence)
+                        break
+                    }
+                }
+            }
+
+            let message: String
+            if let earliest = candidates.min() {
+                let formatter = DateFormatter()
+                formatter.dateFormat = calendar.isDateInToday(earliest) ? "h:mm a" : "EEE h:mm a"
+                message = formatter.string(from: earliest)
+            } else {
+                message = "All done for today"
+            }
+
+            WCSession.default.sendMessage(
+                ["nextCheckIn": message],
+                replyHandler: nil,
+                errorHandler: nil
+            )
+        } catch {
+            // Non-fatal — watch will show stale data until next sync
         }
     }
 
