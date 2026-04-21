@@ -1,11 +1,13 @@
-// SafePing — CheckerPairingView.swift
-// Onboarding screen where the checker enters the check-in user's 6-digit code.
-// [OOP] PairingViewModel redeems the code and creates the Firestore pairing document.
+// SafePing CheckerPairingView.swift
+// Onboarding screen where the checker enters the check in users 6 digit code
+// PairingViewModel redeems the code and creates the Firestore pairing document
 
 import SwiftUI
 
 struct CheckerPairingView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    
+    // Handles code input state, redemption request, loading, and pairing result
     @StateObject private var viewModel = PairingViewModel()
     
     var body: some View {
@@ -27,6 +29,7 @@ struct CheckerPairingView: View {
                     .padding(.horizontal)
             }
             
+            // Success state after pairing is completed
             if viewModel.isPaired {
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
@@ -38,7 +41,8 @@ struct CheckerPairingView: View {
                         .foregroundStyle(.green)
                 }
             } else {
-                // Code input
+                
+                // 6-digit code input field
                 TextField("000000", text: $viewModel.enteredCode)
                     .font(.system(size: 40, weight: .bold, design: .monospaced))
                     .multilineTextAlignment(.center)
@@ -49,11 +53,13 @@ struct CheckerPairingView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal)
                     .onChange(of: viewModel.enteredCode) { _, new in
+                        // Hard limit input to 6 digits
                         if new.count > 6 {
                             viewModel.enteredCode = String(new.prefix(6))
                         }
                     }
                 
+                // Show Firestore / validation error if pairing fails
                 if let error = viewModel.errorMessage {
                     Text(error)
                         .font(.footnote)
@@ -61,6 +67,7 @@ struct CheckerPairingView: View {
                         .padding(.horizontal)
                 }
                 
+                // Submit pairing request
                 Button {
                     Task {
                         await viewModel.redeemCode(
@@ -87,6 +94,7 @@ struct CheckerPairingView: View {
             
             Spacer()
             
+            // Either continue after pairing or allow skipping onboarding step
             Button {
                 authViewModel.completePairing()
             } label: {
@@ -100,6 +108,7 @@ struct CheckerPairingView: View {
             .padding(.horizontal)
             .padding(.bottom)
         }
+        // Automatically advance onboarding shortly after successful pairing
         .onChange(of: viewModel.isPaired) { _, paired in
             if paired {
                 Task {

@@ -1,6 +1,9 @@
-// SafePing — CheckerMapView.swift
-// Shows the last known location of each paired check-in user on a map.
-// [Functional] Map annotation data is derived from pairings' check-in records.
+// SafePing CheckerMapView.swift
+// Shows the last known location of each paired check in user
+
+
+// [OOP] View is driven by CheckInViewModel state and renders derived map annotations
+// [Functional] Map annotation data is derived from pairings check in records
 
 import SwiftUI
 import MapKit
@@ -24,8 +27,9 @@ struct CheckerMapView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+
+            // Empty state: no escalations to display
             if displayedPairings.isEmpty {
-                // No one is escalated
                 VStack(spacing: 16) {
                     Spacer()
                     Image(systemName: "checkmark.shield.fill")
@@ -45,7 +49,8 @@ struct CheckerMapView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // User pills
+
+                // Horizontal selector for escalated users
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(displayedPairings) { pairing in
@@ -54,6 +59,8 @@ struct CheckerMapView: View {
                                 isSelected: pairing.id == (selectedUserId ?? displayedPairings.first?.id)
                             ) {
                                 selectedUserId = pairing.id
+
+                                // Recenter map when switching users
                                 if let loc = pairing.lastKnownLocation {
                                     withAnimation {
                                         position = .region(MKCoordinateRegion(
@@ -75,11 +82,12 @@ struct CheckerMapView: View {
                     .padding(.vertical, 10)
                 }
 
-                // Map
+                // Map section showing last known location
                 if let pairing = selectedPairing, let loc = pairing.lastKnownLocation {
                     Map(position: $position) {
                         Annotation(pairing.checkInUsername, coordinate: CLLocationCoordinate2D(
-                            latitude: loc.latitude, longitude: loc.longitude
+                            latitude: loc.latitude,
+                            longitude: loc.longitude
                         )) {
                             VStack(spacing: 4) {
                                 Image(systemName: "exclamationmark.triangle.fill")
@@ -101,14 +109,16 @@ struct CheckerMapView: View {
                         ))
                     }
 
-                    // Info bar
+                    // Info panel under map
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(pairing.checkInUsername) — missed check-in")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.safePingError)
+
                         Text("Last known location from most recent check-in")
                             .font(.system(size: 12))
                             .foregroundColor(.safePingTextMuted)
+
                         Text(pairing.timeSinceLastCheckIn)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.safePingDark)
@@ -120,16 +130,20 @@ struct CheckerMapView: View {
                     .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 8)
+
                 } else if selectedPairing != nil {
-                    // Escalated but no location data
+
+                    // Escalated user but no location data available
                     VStack(spacing: 12) {
                         Spacer()
                         Image(systemName: "location.slash.fill")
                             .font(.system(size: 36))
                             .foregroundColor(.safePingTextMuted)
+
                         Text("No location data available")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.safePingDark)
+
                         Text("This user's previous check-ins did not include location.")
                             .font(.system(size: 13))
                             .foregroundColor(.safePingTextMuted)

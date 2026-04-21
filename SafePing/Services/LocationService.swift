@@ -1,88 +1,89 @@
-// SafePing — LocationService.swift
-// Wraps CLLocationManager to request permission and deliver the device's
-// current coordinate before a check-in is written to Firestore.
-// [OOP] NSObject subclass required for CLLocationManagerDelegate conformance.
+// SafePing  LocationService.swift
 
-
+// Handles location permission and retrieves the devicecs current location
+// Used to attach location data to checkcins.
+//
 import CoreLocation
 import SwiftUI
 
-// Manages location permission and provides the current device coordinates
-// for attaching to check-in records.
+// LocationService
+// Manages location access and provides coordinates when needed.
+//
+// [OOP] Class uses inheritance
+// [OOP] Conforms to ObservableObject
+//
 class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     private let manager = CLLocationManager()
 
-    // Nil until permission is granted and the first fix arrives,
-    // or if permission is denied.
+    // Current device location
     @Published var currentLocation: CLLocation?
 
-    // The current authorization status. Observed by SettingsView to show
-    // the iOS Settings deep link when access is denied.
+    // Current permission status
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
 
-    // Used for the async captureLocationAsync() wrapper.
-    // Set before requestLocation()
+    // Used for async location requests
     private var locationContinuation: CheckedContinuation<CLLocation?, Never>?
 
+    // Initializer
+    // Sets up location manager and delegate
+    //
     override init() {
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        // Hundred-metre accuracy is sufficient for check-ins
         authorizationStatus = manager.authorizationStatus
     }
 
-    // MARK: - Permission
 
-    // Requests When In Use permission. Called during the check-in user
-    // onboarding flow. Safe to call more than once — iOS ignores repeated
-    // requests after the user has already responded.
+    // Requests location permission from the user
+    // [OOP] Uses system API via CLLocationManager
     func requestPermission() {
         manager.requestWhenInUseAuthorization()
     }
 
-    // Returns true if the app has sufficient permission to read location.
+    // Returns true if location access is allowed
     var hasPermission: Bool {
         authorizationStatus == .authorizedWhenInUse ||
         authorizationStatus == .authorizedAlways
     }
 
-    // MARK: - Location capture
 
-    // Requests a single location update. The result is delivered to
-    // `currentLocation` via the delegate. Call just before
-    // `performCheckIn` so the fix is as fresh as possible.
+    // Requests a single location update
+    // [Procedural] step by step logic
     func captureLocation() {
         guard hasPermission else { return }
         manager.requestLocation()
     }
 
-    // Async wrapper for `captureLocation`.
-    // Returns nil if permission is denied or the GPS fix fails.
+    // Async version of captureLocation
+    // Returns location or nil if unavailable
+    // [Procedural] Controls async flow
     func captureLocationAsync() async -> CLLocation? {
         guard hasPermission else { return nil }
+
         return await withCheckedContinuation { continuation in
             locationContinuation = continuation
             manager.requestLocation()
         }
     }
 
-    // MARK: - CLLocationManagerDelegate
 
+    // Called when location is successfully retrieved
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         currentLocation = locations.last
         locationContinuation?.resume(returning: locations.last)
         locationContinuation = nil
     }
 
+    // Called if location request fails
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        // Non-fatal — check-in proceeds without location if a fix can't be obtained.
-        print("LocationService: failed to get location — \(error.localizedDescription)")
+        print("Location error: \(error.localizedDescription)")
         locationContinuation?.resume(returning: nil)
         locationContinuation = nil
     }
 
+    // Called when permission status changes
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         DispatchQueue.main.async {
             self.authorizationStatus = manager.authorizationStatus

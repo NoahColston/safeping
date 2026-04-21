@@ -1,14 +1,23 @@
-// SafePing — PairingService.swift
-// Handles Firestore reads/writes for pairing codes and pairing documents.
-// [OOP] Stateless service class; no @Published properties -- callers hold state.
+// SafePing  PairingService.swift
 
+// Handles Firestore reads and writes for pairing codes and pairing documents
+// Used to create, redeem, and remove user pairings
+//
 import Foundation
 import FirebaseFirestore
 
+// PairingService
+// Stateless service responsible for Firestore pairing logic
+//
+// [OOP] Class used as a service layer
+//
 class PairingService {
     private let db = Firestore.firestore()
     
-    // MARK: Checkee: generate a 6-digit code and save to Firebase
+    // MARK: Checkee: generate pairing code
+    
+    // Generates a 6 digit pairing code and stores it in Firestore
+    // [Procedural] Step-by-step data creation and database write
     func generatePairingCode(for checkeeUsername: String) async throws -> String {
         let code = String(format: "%06d", Int.random(in: 0...999999))
         let now = Date()
@@ -29,7 +38,8 @@ class PairingService {
         return code
     }
     
-    // MARK: Checker: look up code and create the pair
+    
+    // Validates a code and creates a pairing between two users
     func redeemPairingCode(_ code: String, checkerUsername: String) async throws -> Pairing {
         let doc = try await db.collection("pairingCodes")
             .document(code)
@@ -47,12 +57,12 @@ class PairingService {
         
         let checkeeUsername = data["checkeeUsername"] as? String ?? ""
         
-        // Check for an existing active pairing between these two users
-            let existing = try await db.collection("pairs")
-                .whereField("checkerUsername", isEqualTo: checkerUsername)
-                .whereField("checkInUsername", isEqualTo: checkeeUsername)
-                .getDocuments()
-            guard existing.documents.isEmpty else { throw PairingError.alreadyPaired }
+        // Check for existing pairing
+        let existing = try await db.collection("pairs")
+            .whereField("checkerUsername", isEqualTo: checkerUsername)
+            .whereField("checkInUsername", isEqualTo: checkeeUsername)
+            .getDocuments()
+        guard existing.documents.isEmpty else { throw PairingError.alreadyPaired }
         
         // Mark code as used
         try await db.collection("pairingCodes")
@@ -61,7 +71,8 @@ class PairingService {
         
         let defaultSchedules = [CheckInSchedule()]
         let now = Date()
-        // Create the pair
+        
+        // Create new pairing object
         let pairing = Pairing(
             checkerUsername: checkerUsername,
             checkInUsername: checkeeUsername,
@@ -86,16 +97,17 @@ class PairingService {
         return pairing
     }
     
-    // MARK: Remove a pairing (Story 13)
+    
+    // Deletes a pairing from Firestore
     func removePairing(pairingId: UUID) async throws {
         try await db.collection("pairs")
             .document(pairingId.uuidString)
             .delete()
     }
-    
-
 }
 
+// PairingError
+// Represents possible errors during pairing operations
 enum PairingError: LocalizedError {
     case invalidCode
     case alreadyUsed
@@ -107,7 +119,7 @@ enum PairingError: LocalizedError {
         case .invalidCode: return "That code doesn't exist. Double-check and try again."
         case .alreadyUsed: return "This code has already been used."
         case .expired:     return "This code has expired. Ask for a new one."
-        case .alreadyPaired:     return "You are already paired with that user."
+        case .alreadyPaired: return "You are already paired with that user."
         }
     }
 }

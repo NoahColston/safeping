@@ -1,6 +1,6 @@
-// SafePing — PairingViewModel.swift
-// Generates and redeems 6-digit pairing codes via Firestore.
-// [OOP] Thin VM layer that delegates storage to PairingService.
+// SafePing PairingViewModel.swift
+// Generates and redeems 6 digit pairing codes via Firestore
+// [OOP] Thin VM layer that delegates storage to PairingService
 
 import SwiftUI
 
@@ -21,7 +21,7 @@ class PairingViewModel: ObservableObject {
     
     private let pairingService = PairingService()
     
-    // MARK: - Checkee: generate code
+    // [PROCEDURAL] async flow: service call to state update to error handling
     func generateCode(for username: String) async {
         isLoading = true
         errorMessage = nil
@@ -33,7 +33,7 @@ class PairingViewModel: ObservableObject {
         isLoading = false
     }
     
-    // MARK: - Checker: redeem code
+    // [PROCEDURAL] validation + async service call + state mutation
     func redeemCode(checkerUsername: String) async {
         guard enteredCode.count == 6 else {
             errorMessage = "Please enter a 6-digit code."

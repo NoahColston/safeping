@@ -1,6 +1,6 @@
-// SafePing — CheckInUserDashboardView.swift
+// SafePing CheckInUserDashboardView.swift
 // Main dashboard for users who check in. Shows today's schedules, streak,
-// calendar history, and a live weather card (networking demo).
+// calendar history, and a live weather card
 
 import SwiftUI
 
@@ -141,19 +141,20 @@ struct CheckInUserDashboardView: View {
         }
         .background(Color.safePingBg.ignoresSafeArea())
         .onAppear {
-            // Request location permission if not yet determined.
+            // Request location permission if not yet determined
             if locationService.authorizationStatus == .notDetermined {
                 locationService.requestPermission()
             }
             if let user = authViewModel.currentUser {
                 Task {
                     await checkInViewModel.loadData(for: user.username, role: .checkInUser)
-                    // Schedule reminder with checker's custom message (Story 14)
+                    
+                    // Schedule reminder with checker's custom message
                     if checkInViewModel.pairings.isEmpty {
                         await pairingViewModel.generateCode(for: user.username)
                     } else {
                         // Ensure notifications are always scheduled on launch,
-                        // not just when pairingsFingerprint changes.
+                        // not just when pairingsFingerprint changes
                         notificationService.scheduleAllReminders(
                             for: checkInViewModel.pairings,
                             username: user.username
@@ -188,7 +189,6 @@ struct CheckInUserDashboardView: View {
                 await pairingViewModel.generateCode(for: username)
             }
         }
-        // Story 12: Sheet to generate a new pairing code for another checker
         .sheet(isPresented: $showPairingCode) {
             GetPairingCodeSheet()
                 .environmentObject(authViewModel)
@@ -280,8 +280,9 @@ struct CheckInUserDashboardView: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
     }
-    /// Cheap fingerprint of the fields that should trigger a notification
-    /// reschedule when they change.
+
+    // Cheap fingerprint of the fields that should trigger a notification
+    // eschedule when they change
     private var pairingsFingerprint: String {
         checkInViewModel.pairings.map { pairing in
             let scheduleParts = pairing.schedules.map {
@@ -291,7 +292,7 @@ struct CheckInUserDashboardView: View {
         }.joined(separator: "/")
     }
 
-    // MARK: - Today's check-ins card (per-slot buttons)
+    // Todays check ins card
     @ViewBuilder
     private func todaysCheckInsCard(pairing: Pairing) -> some View {
         let today = Date()
@@ -375,7 +376,6 @@ struct CheckInUserDashboardView: View {
     }
 }
 
-// MARK: - Info Card
 struct InfoCard: View {
     let title: String
     let value: String
@@ -414,7 +414,7 @@ struct InfoCard: View {
     }
 }
 
-// MARK: - Today slot row (one per scheduled check-in for the day)
+//Today slot row
 private struct TodaySlotRow: View {
     let schedule: CheckInSchedule
     let status: CheckInStatus?
@@ -540,7 +540,6 @@ private struct TodaySlotRow: View {
     }
 }
 
-// MARK: - Story 12: Get Pairing Code Sheet (checkee shares code with another checker)
 struct GetPairingCodeSheet: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var vm = PairingViewModel()
@@ -615,7 +614,6 @@ struct GetPairingCodeSheet: View {
         }
     }
 }
-
 
 #Preview {
     let vm = AuthViewModel()

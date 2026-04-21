@@ -1,6 +1,8 @@
 // SafePing — CheckInLogView.swift
-// Chronological history of all check-in events for the selected pairing.
-// [Functional] Derives sorted log entries from CheckIn records in the pairing.
+// Chronological history of all check in events for the selected pairing
+// Displays grouped daily logs with status, timestamps, and optional location indicators
+
+// [Functional] Derives sorted and grouped log entries from CheckIn records in the pairing
 
 import SwiftUI
 
@@ -82,6 +84,8 @@ struct CheckInLogView: View {
 }
 
 private struct LogRow: View {
+    // Individual log entry row showing a single check in event
+    // Displays status time, and optional location indicator
     let checkIn: CheckIn
     let pairing: Pairing
 

@@ -1,12 +1,18 @@
 // SafePing — NotificationService.swift
-// Schedules and cancels local reminder and escalation notifications.
-// Acts as UNUserNotificationCenterDelegate to handle foreground delivery
-// and the "Check In Now" actionable notification button.
-// [OOP] Single service object injected app-wide via @EnvironmentObject.
+
+// Handles scheduling and cancelling local notifications
+// Also processes notification actions like "Check In"
+//
 
 import UserNotifications
 import FirebaseFirestore
 
+
+// NotificationService
+// Manages reminders, escalation alerts, and notification actions
+//
+// [OOP] Class using delegate pattern and ObservableObject
+//
 class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     
     static let checkInActionId   = "CHECK_IN_ACTION"
@@ -27,7 +33,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         registerCheckInCategory()
     }
     
-    // MARK: - Story 16: Register "Check In" action button on notifications
     func registerCheckInCategory() {
         let checkInAction = UNNotificationAction(
             identifier: NotificationService.checkInActionId,
@@ -43,7 +48,9 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         UNUserNotificationCenter.current().setNotificationCategories([category])
     }
     
-    // MARK: - Request permission
+    
+    // Requests notification permission
+    // [Procedural] Handles async permission flow
     func requestPermission() async {
         do {
             let granted = try await UNUserNotificationCenter.current()
@@ -57,7 +64,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
             print("Notification permission error: \(error)")
         }
     }
-    // MARK: - Refresh permission status from system (call on settings appear)
     func refreshPermissionStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         await MainActor.run {
@@ -71,9 +77,8 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     
     
-    // MARK: - Schedule daily check-in reminder
-    // Story 14: supports custom message and schedule time
-    // Story 16: attaches action button category and stores username in userInfo
+    // Schedules reminders for all pairings
+    // [Procedural] Iterates through pairings and schedules
     func scheduleAllReminders(for pairings: [Pairing], username: String) {
         Task {
             await cancelAllCheckInRemindersAsync()
@@ -131,10 +136,8 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         }
     }
     
-    // MARK: - Escalation notifications (fire after grace period if not checked in)
-    // These are scheduled on the checkee's device. Each one fires at
-    // (scheduled time + gracePeriodMinutes). When the checkee performs a
-    // check-in, the corresponding escalation notification is cancelled.
+    // Schedules escalation alerts after missed check ins
+    // [Procedural] Calculates adjusted time and schedules notifications
     static let escalationRequestPrefix = "escalation-"
 
     func scheduleEscalationNotifications(for pairings: [Pairing], username: String) {
@@ -192,7 +195,7 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         }
     }
 
-    // Cancel a specific schedule's escalation notification (call when check-in succeeds)
+    // Cancel a specific schedule's escalation notification
     func cancelEscalationForSchedule(pairingId: UUID, scheduleId: UUID) {
         Task {
             let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
@@ -208,7 +211,8 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: toCancel)
     }
 
-    // MARK: - Story 16: Handle "Check In" action tapped from notification banner
+    // Handles "Check In" action from notification
+    // [OOP] Delegate method
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
@@ -240,7 +244,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         completionHandler([.banner, .sound])
     }
     
-    // MARK: - Save check-in to Firebase directly from the notification (no app open needed)
     private func saveCheckInFromNotification(
         username: String,
         pairingId: String,
@@ -298,7 +301,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
             .setData(data)
     }
     
-    // MARK: - Simulate checker being notified
     func simulateCheckerAlert(checkeeName: String) {
         let content = UNMutableNotificationContent()
         content.title = "✅ \(checkeeName) checked in"
@@ -311,7 +313,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     
     
-    // MARK: - Cancel check-in reminders only (scoped by prefix)
     func cancelAllCheckInReminders() {
         Task { await cancelAllCheckInRemindersAsync() }
     }
@@ -324,7 +325,6 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: toCancel)
     }
     
-    // MARK: - Cancel everything (used by sign-out)
     func cancelAllNotifications() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }

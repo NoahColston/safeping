@@ -1,5 +1,5 @@
-// SafePing — CheckeeLocationView.swift
-// Shows the check-in user's LAST known location on a map for the checker.
+// SafePing  CheckeeLocationView.swift
+// Displays the check in users most recent known location on a map for the checker
 
 import SwiftUI
 import MapKit
@@ -91,7 +91,7 @@ struct CheckeeLocationView: View {
             Text("No location yet")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.safePingDark)
-            Text("Your check-in locations will appear here once you allow location access and check in.")
+            Text("Check-in locations will appear here once location access is enabled and a check-in is recorded.")
                 .font(.system(size: 14))
                 .foregroundColor(.safePingTextMuted)
                 .multilineTextAlignment(.center)

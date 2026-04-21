@@ -1,11 +1,18 @@
-// SafePing — Pairing.swift
-// Domain models for pairings and schedules. A Pairing links one checker to one
-// check-in user and holds all schedules plus the check-in history.
-// [OOP] All models are value types (struct/enum) for safe cross-actor sharing.
+// SafePing Pairing.swift
 
+// Defines the data models for pairings and schedules
+// A Pairing links one checker to one check in user
+// and stores schedules and check in history.
+//
 import Foundation
 
-// MARK: - Check-in Schedule
+
+// CheckInFrequency
+// Represents how often a check in occurs
+//
+// - daily: occurs every day
+// - weekly: occurs on selected days
+//
 enum CheckInFrequency: String, Codable, CaseIterable {
     case daily = "Every Day"
     case weekly = "Weekly"
@@ -13,13 +20,32 @@ enum CheckInFrequency: String, Codable, CaseIterable {
     var displayName: String { rawValue }
 }
 
+// SlotStatus
+// Represents the visual state of a schedule slot
+//
+// - checkedIn: completed
+// - missed: past grace period with no check in
+// - inGrace: within grace period
+// - upcoming: not yet reached
+//
 enum SlotStatus: Hashable {
-    case checkedIn   // green — completed
-    case missed      // red — past grace period, no check-in
-    case inGrace     // yellow — scheduled time passed, still within grace period
-    case upcoming    // grey — scheduled time hasn't arrived yet
+    case checkedIn
+    case missed
+    case inGrace
+    case upcoming
 }
 
+// Struct: CheckInSchedule
+// Represents a scheduled check in time.
+//
+// Properties:
+// - id: unique identifier
+// - message: optional custom message
+// - time: scheduled time of day
+// - frequency: daily or weekly
+// - activeDays: days of week for weekly schedules
+// - gracePeriodMinutes: allowed late time before marking missed
+//
 struct CheckInSchedule: Codable, Identifiable, Hashable {
     let id: UUID
     var message: String
@@ -28,6 +54,9 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
     var activeDays: Set<Int>
     var gracePeriodMinutes: Int
 
+    // Initializer
+    // Creates a new schedule with optional defaults
+    //
     init(
         id: UUID = UUID(),
         message: String = "",
@@ -44,31 +73,35 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
         self.gracePeriodMinutes = gracePeriodMinutes
     }
 
+    // Returns hour component of scheduled time
     var hour: Int {
         Calendar.current.component(.hour, from: time)
     }
 
+    // Returns minute component of scheduled time
     var minute: Int {
         Calendar.current.component(.minute, from: time)
     }
 
+    // Returns formatted time string (ex: 9:00 AM)
     var formattedTime: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: time)
     }
     
+    // Returns message if provided, otherwise time
     var displayMessage: String {
         message.isEmpty ? formattedTime : message
     }
 
+    // Checks if schedule applies on a given weekday
     func isScheduled(weekday: Int) -> Bool {
         if frequency == .daily { return true }
         return activeDays.contains(weekday)
     }
     
-    // Returns the deadline for check-in before
-    // the checker is alerted.
+    // Returns the deadline time after grace period
     func escalationTime(for date: Date) -> Date? {
         let calendar = Calendar.current
         let weekday = calendar.component(.weekday, from: date)
@@ -80,6 +113,7 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
         return calendar.date(byAdding: .minute, value: gracePeriodMinutes, to: scheduledTime)
     }
     
+    // Converts schedule to Firestore format
     func toFirestore() -> [String: Any] {
         [
             "id": id.uuidString,
@@ -92,7 +126,7 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
         ]
     }
      
-        
+    // Creates a schedule from Firestore data
     static func fromFirestore(_ data: [String: Any]) -> CheckInSchedule {
         let id = (data["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
         let message = data["message"] as? String ?? ""
@@ -104,20 +138,41 @@ struct CheckInSchedule: Codable, Identifiable, Hashable {
         let gracePeriod = data["gracePeriodMinutes"] as? Int ?? 15
         let time = Calendar.current.date(from: DateComponents(hour: hour, minute: minute)) ?? Date()
  
-        return CheckInSchedule(id: id, message: message, time: time, frequency: frequency, activeDays: Set(activeDaysArray), gracePeriodMinutes: gracePeriod)
+        return CheckInSchedule(
+            id: id,
+            message: message,
+            time: time,
+            frequency: frequency,
+            activeDays: Set(activeDaysArray),
+            gracePeriodMinutes: gracePeriod
+        )
     }
 }
 
-// MARK: - Pairing
+
+// Struct: Pairing
+//
+// Properties:
+// - id: unique pairing id
+// - checkerUsername: user monitoring check ins
+// - checkInUsername: user performing check ins
+// - schedules: list of schedules
+// - checkIns: history of check ins
+// - currentStreak: consecutive successful check ins
+// - pairedAt: date pairing was created
+//
 struct Pairing: Identifiable, Codable {
     let id: UUID
     let checkerUsername: String
     let checkInUsername: String
     var schedules: [CheckInSchedule]
     var checkIns: [CheckIn]
-    var currentStreak: Int // streak tracker
+    var currentStreak: Int
     var pairedAt: Date
 
+    // Initializer
+    // Creates a new pairing
+    //
     init(
         id: UUID = UUID(),
         checkerUsername: String,
@@ -136,13 +191,14 @@ struct Pairing: Identifiable, Codable {
         self.pairedAt = pairedAt
     }
     
-    // Schedules that apply on the given date, sorted by time.
+    // Returns schedules for a given date
     func schedules(forDate date: Date) -> [CheckInSchedule] {
         let weekday = Calendar.current.component(.weekday, from: date)
         return schedules.filter { $0.isScheduled(weekday: weekday) }
             .sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
     }
 
+    // Returns check-in for a specific date and schedule
     func checkIn(forDate date: Date, scheduleId: UUID) -> CheckIn? {
         let calendar = Calendar.current
         return checkIns.first { ci in
@@ -151,11 +207,12 @@ struct Pairing: Identifiable, Codable {
         }
     }
 
-
+    // Returns status for a specific schedule
     func status(for date: Date, scheduleId: UUID) -> CheckInStatus? {
         checkIn(forDate: date, scheduleId: scheduleId)?.status
     }
     
+    // Returns overall status for a day
     func status(for date: Date) -> CheckInStatus? {
         let calendar = Calendar.current
     
@@ -176,12 +233,10 @@ struct Pairing: Identifiable, Codable {
         return .pending
     }
     
-    // Returns an ordered array of per-schedule slot statuses for a given date,
-    // sorted by schedule time. Used by the calendar pie-chart dot.
+    // Returns per schedule slot statuses for UI display
     func slotStatuses(for date: Date, at now: Date = Date()) -> [SlotStatus] {
         let calendar = Calendar.current
         
-        // Before pairing existed — no data
         if calendar.startOfDay(for: date) < calendar.startOfDay(for: pairedAt) {
             return []
         }
@@ -199,7 +254,6 @@ struct Pairing: Identifiable, Codable {
                 return .checkedIn
             }
             
-            // Build the scheduled time on the target date
             var components = calendar.dateComponents([.year, .month, .day], from: date)
             components.hour = schedule.hour
             components.minute = schedule.minute
@@ -207,25 +261,24 @@ struct Pairing: Identifiable, Codable {
             let graceDeadline = calendar.date(byAdding: .minute, value: schedule.gracePeriodMinutes, to: scheduledTime) ?? scheduledTime
             
             if isPast {
-                // Any past day slot without a check-in is missed
                 return .missed
             }
             
             if isDateToday {
                 if now < scheduledTime {
-                    return .upcoming       // grey — hasn't fired yet
+                    return .upcoming
                 } else if now <= graceDeadline {
-                    return .inGrace        // yellow — in grace period
+                    return .inGrace
                 } else {
-                    return .missed         // red — past grace period
+                    return .missed
                 }
             }
             
-            // Future date
             return .upcoming
         }
     }
 
+    // Most recent successful check in
     var lastCheckIn: CheckIn? {
         checkIns
             .filter { $0.status == .checkedIn }
@@ -233,6 +286,7 @@ struct Pairing: Identifiable, Codable {
             .first
     }
 
+    // Time since last check in
     var timeSinceLastCheckIn: String {
         guard let last = lastCheckIn else { return "No check-ins yet" }
         let interval = Date().timeIntervalSince(last.date)
@@ -249,6 +303,7 @@ struct Pairing: Identifiable, Codable {
         }
     }
 
+    // Description of last check in
     var lastCheckInDescription: String {
         guard let last = lastCheckIn else { return "" }
         let formatter = DateFormatter()
@@ -256,32 +311,29 @@ struct Pairing: Identifiable, Codable {
         return "Last checked in \(formatter.string(from: last.date))"
     }
     
-    // Returns schedules that are currently past their grace period without a check-in today.
+    // Returns schedules that missed check in past grace period today
     func escalatedSchedules(at now: Date = Date()) -> [CheckInSchedule] {
         let calendar = Calendar.current
         let todaysSchedules = schedules(forDate: now)
         return todaysSchedules.filter { schedule in
             guard let deadline = schedule.escalationTime(for: now) else { return false }
             guard now > deadline else { return false }
-            // No check-in recorded for this slot today
             return status(for: now, scheduleId: schedule.id) != .checkedIn
         }
     }
 
+    // Returns true if any escalation condition is met
     var isEscalated: Bool {
         let calendar = Calendar.current
         let now = Date()
 
         for schedule in schedules {
-            // Today's grace period passed without a check-in
             if let deadline = schedule.escalationTime(for: now),
                now > deadline,
                status(for: now, scheduleId: schedule.id) != .checkedIn {
                 return true
             }
 
-            // Most recent scheduled day before today was missed
-            // and today's slot hasn't been completed yet
             var cursor = now
             for _ in 0..<7 {
                 guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
@@ -289,19 +341,18 @@ struct Pairing: Identifiable, Codable {
                 let wd = calendar.component(.weekday, from: cursor)
                 guard schedule.isScheduled(weekday: wd) else { continue }
 
-                // Found the last scheduled day — check its status
                 let pastStatus = status(for: cursor, scheduleId: schedule.id)
                 let todayStatus = status(for: now, scheduleId: schedule.id)
                 if pastStatus != .checkedIn && todayStatus != .checkedIn {
                     return true
                 }
-                break // only care about the most recent one
+                break
             }
         }
         return false
     }
 
-    // The most recent check-in that has location data, for map display.
+    // Returns last known location from check ins
     var lastKnownLocation: (latitude: Double, longitude: Double)? {
         guard let ci = checkIns
             .filter({ $0.status == .checkedIn && $0.latitude != nil && $0.longitude != nil })
@@ -312,8 +363,6 @@ struct Pairing: Identifiable, Codable {
         return (lat, lon)
     }
     
-    // Next upcoming scheduled time across all schedules that has not
-    // already been checked in. Returns nil when all slots are done.
     var nextScheduledOccurrence: Date? {
         let calendar = Calendar.current
         let now = Date()
@@ -340,6 +389,7 @@ struct Pairing: Identifiable, Codable {
         return candidates.min()
     }
 
+    // Formatted next scheduled time
     var nextScheduledFormatted: String {
         guard let next = nextScheduledOccurrence else { return "—" }
         let formatter = DateFormatter()
@@ -350,5 +400,4 @@ struct Pairing: Identifiable, Codable {
         formatter.dateFormat = "EEE h:mm a"
         return formatter.string(from: next)
     }
-    
 }

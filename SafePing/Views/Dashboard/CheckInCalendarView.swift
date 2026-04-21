@@ -1,6 +1,6 @@
-// SafePing — CheckInCalendarView.swift
-// Monthly calendar showing check-in completion per day as dots (pie slice for partial).
-// [Functional] Calendar grid is computed from the pairing's check-in history.
+// SafePing  CheckInCalendarView.swift
+// Monthly calendar showing check-in completion per day as dots
+// [Functional] Calendar grid is computed from the pairings check in history
 
 import SwiftUI
 
@@ -13,7 +13,7 @@ struct CheckInCalendarView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            // Month/year navigation
+            // Month/year navigation controls
             HStack {
                 Button(action: previousMonth) {
                     Image(systemName: "chevron.left")
@@ -24,6 +24,7 @@ struct CheckInCalendarView: View {
 
                 Spacer()
 
+                // Current displayed month and year label
                 HStack(spacing: 8) {
                     Text(monthString)
                         .font(.system(size: 16, weight: .semibold))
@@ -45,7 +46,7 @@ struct CheckInCalendarView: View {
             }
             .padding(.horizontal, 4)
 
-            // Day-of-week headers
+            // Day of week headers
             HStack(spacing: 0) {
                 ForEach(daySymbols, id: \.self) { symbol in
                     Text(symbol)
@@ -55,7 +56,7 @@ struct CheckInCalendarView: View {
                 }
             }
 
-            // Day grid
+            // Calendar grid
             let days = daysInMonth()
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 8) {
                 ForEach(days, id: \.self) { date in
@@ -79,31 +80,36 @@ struct CheckInCalendarView: View {
         .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
     }
 
-    // MARK: - Helpers
+
+    // Returns formatted month string
     private var monthString: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM"
         return formatter.string(from: displayedMonth)
     }
 
+    // Returns formatted year string
     private var yearString: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy"
         return formatter.string(from: displayedMonth)
     }
 
+    // Navigate to previous month
     private func previousMonth() {
         withAnimation(.easeInOut(duration: 0.2)) {
             displayedMonth = calendar.date(byAdding: .month, value: -1, to: displayedMonth) ?? displayedMonth
         }
     }
 
+    // Navigate to next month
     private func nextMonth() {
         withAnimation(.easeInOut(duration: 0.2)) {
             displayedMonth = calendar.date(byAdding: .month, value: 1, to: displayedMonth) ?? displayedMonth
         }
     }
 
+    // Builds full calendar grid including padding days before/after month
     private func daysInMonth() -> [Date?] {
         guard let range = calendar.range(of: .day, in: .month, for: displayedMonth),
               let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: displayedMonth))
@@ -120,7 +126,7 @@ struct CheckInCalendarView: View {
             }
         }
 
-        // Trailing days to fill the grid
+        // Fill trailing cells to complete grid row alignment
         let remaining = (7 - (days.count % 7)) % 7
         if remaining > 0, let lastNonNil = days.compactMap({ $0 }).last {
             for offset in 1...remaining {
@@ -134,7 +140,6 @@ struct CheckInCalendarView: View {
     }
 }
 
-// MARK: - Individual Day Cell
 struct DayCell: View {
     let date: Date
     let slotStatuses: [SlotStatus]
@@ -149,7 +154,7 @@ struct DayCell: View {
         let isFuture = date > Date() && !isToday
 
         ZStack {
-            // Background circle for status
+            // Background visualization
             if !slotStatuses.isEmpty && !isFuture {
                 PieChartDot(statuses: slotStatuses, size: dotSize)
             } else if isToday {
@@ -166,10 +171,10 @@ struct DayCell: View {
         .opacity(isCurrentMonth ? 1.0 : 0.35)
     }
 
+    // Determines text color based on state
     private func textColor(isFuture: Bool) -> Color {
         if isFuture { return .safePingTextMuted.opacity(0.5) }
         if !slotStatuses.isEmpty {
-            // Use white text when the dominant color is dark enough
             let hasVisibleDot = slotStatuses.contains { $0 != .upcoming }
             if hasVisibleDot { return .white }
         }
@@ -177,9 +182,7 @@ struct DayCell: View {
     }
 }
 
-// Draws a circle divided into equal wedges, one per schedule slot,
-// colored by that slot's status. Wedges start at 12 o'clock and
-// proceed clockwise.
+// Draws a circular segmented indicator for multi-slot schedules
 struct PieChartDot: View {
     let statuses: [SlotStatus]
     let size: CGFloat
@@ -190,7 +193,7 @@ struct PieChartDot: View {
             let radius = min(canvasSize.width, canvasSize.height) / 2
 
             if statuses.count == 1 {
-                // Single slot — just draw a filled circle
+                // Single slot day to solid circle
                 let rect = CGRect(x: center.x - radius, y: center.y - radius,
                                   width: radius * 2, height: radius * 2)
                 let path = Path(ellipseIn: rect)
@@ -201,7 +204,6 @@ struct PieChartDot: View {
             let sliceAngle = 360.0 / Double(statuses.count)
 
             for (index, status) in statuses.enumerated() {
-                // Start at 12 o'clock (-90°), move clockwise
                 let startAngle = Angle.degrees(-90 + sliceAngle * Double(index))
                 let endAngle = Angle.degrees(-90 + sliceAngle * Double(index + 1))
 
@@ -219,6 +221,7 @@ struct PieChartDot: View {
         .clipShape(Circle())
     }
 
+    // Maps status to visual color
     private func color(for status: SlotStatus) -> Color {
         switch status {
         case .checkedIn: return .safePingGreenMid.opacity(0.85)

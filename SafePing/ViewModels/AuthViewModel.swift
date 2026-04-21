@@ -1,5 +1,5 @@
-// SafePing — AuthViewModel.swift
-// Manages authentication state: login, registration, session restore, and role selection.
+// SafePing  AuthViewModel.swift
+// Manages authentication state: login, registration, session restore, and role selection
 // [OOP] @MainActor class encapsulates all auth state and Firestore operations.
 // [Procedural] login() and register() sequence: validate → hash → read/write Firestore → update state.
 // [Functional] Computed properties (needsRoleSelection, needsNotificationPermission) derive
@@ -11,7 +11,6 @@ import FirebaseFirestore
 
 @MainActor
 class AuthViewModel: ObservableObject {
-    // MARK: - Published State
     @Published var isAuthenticated = false
     @Published var currentUser: User?
     @Published var errorMessage: String?
@@ -29,13 +28,13 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    /// True when the user is logged in but has not yet selected a role
+    // True when the user is logged in but has not yet selected a role
     var needsRoleSelection: Bool {
         guard let user = currentUser else { return false }
         return user.role == nil
     }
 
-    // MARK: - Session Restore
+    // Restores user session from local storage and loads Firestore user data if available
     func restoreSession() async {
         guard let savedUsername = UserDefaults.standard.string(forKey: "currentUsername") else { return }
         isLoading = true
@@ -48,17 +47,17 @@ class AuthViewModel: ObservableObject {
                 loadPairingState()
                 startPairsListener()
             } else {
-                // Account no longer exists in Firebase - clear stale session
+                // Account no longer exists in Firebase  clear stale session
                 UserDefaults.standard.removeObject(forKey: "currentUsername")
             }
         } catch {
-            // Network unavailable - clear session so user can log in again
+            // Network unavailable clear session so user can log in again
             UserDefaults.standard.removeObject(forKey: "currentUsername")
         }
         isLoading = false
     }
 
-    // MARK: - Validation
+    // Validates registration input before attempting Firestore write.
     struct ValidationResult {
         var isValid: Bool
         var usernameError: String?
@@ -66,6 +65,7 @@ class AuthViewModel: ObservableObject {
         var confirmPasswordError: String?
     }
 
+    // Checks username length, password strength, and password match.
     func validateRegistration(username: String, password: String, confirmPassword: String) -> ValidationResult {
         var result = ValidationResult(isValid: true)
 
@@ -87,7 +87,7 @@ class AuthViewModel: ObservableObject {
         return result
     }
 
-    // MARK: - Login
+    // Procedural flow: validate input → fetch Firestore user → hash compare → update session state.
     func login(username: String, password: String) {
         errorMessage = nil
 
@@ -118,11 +118,12 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Pairing
+    // Updates local pairing completion state
     func completePairing() {
         pairingComplete = true
     }
 
+    // Loads cached pairing state from UserDefaults
     func loadPairingState() {
         guard let username = currentUser?.username else {
             pairingComplete = false
@@ -131,6 +132,7 @@ class AuthViewModel: ObservableObject {
         pairingComplete = UserDefaults.standard.bool(forKey: "pairingComplete_\(username)")
     }
     
+    // Starts Firestore listener to detect when user gets paired
     private func startPairsListener() {
         pairsListener?.remove()
         pairsListener = nil
@@ -138,7 +140,7 @@ class AuthViewModel: ObservableObject {
         guard let user = currentUser, let role = user.role else { return }
 
         // If already paired, no need for a live listener
-        // CheckInViewModel handles live updates on the dashboard.
+        // CheckInViewModel handles live updates on the dashboard
         if pairingComplete { return }
 
         let field = role == .checker ? "checkerUsername" : "checkInUsername"
@@ -162,12 +164,13 @@ class AuthViewModel: ObservableObject {
             }
     }
 
+    // Stops Firestore listener when no longer needed
     private func stopPairsListener() {
         pairsListener?.remove()
         pairsListener = nil
     }
 
-    // MARK: - Register (field validation is synchronous; Firebase write is async)
+    // Procedural flow: validate → check existence → hash password → write user → update state.
     func register(username: String, password: String, confirmPassword: String) -> ValidationResult {
         errorMessage = nil
 
@@ -211,7 +214,7 @@ class AuthViewModel: ObservableObject {
         return ValidationResult(isValid: true)
     }
 
-    // MARK: - Role Selection
+    // Updates user role in Firestore and local state.
     func setRole(_ role: UserRole) {
         guard var user = currentUser else { return }
         user.role = role
@@ -231,7 +234,6 @@ class AuthViewModel: ObservableObject {
         startPairsListener()
     }
 
-    // MARK: - Complete Onboarding
     func completeOnboarding() {
         onboardingComplete = true
         if let username = currentUser?.username {
@@ -239,7 +241,7 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Logout
+    // Clears local session state and stops active listeners.
     func logout() {
         stopPairsListener()
         if let username = currentUser?.username {
@@ -253,10 +255,7 @@ class AuthViewModel: ObservableObject {
         pairingComplete = false
     }
 
-    // MARK: - Delete Account
-    // Permanently removes the user's Firestore data and local state.
-    // Deletes: user document, all pairings (as checker or check-in user),
-    // all check-ins tied to those pairings, and any unused pairing codes.
+    // Permanently deletes user data from Firestore (users, pairs, check-ins, codes).
     @Published var isDeleting = false
 
     func deleteAccount() async {
@@ -320,7 +319,7 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Firestore Helpers
+    // Converts User model → Firestore dictionary
     private func userToFirestore(_ user: User) -> [String: Any] {
         var data: [String: Any] = [
             "id": user.id.uuidString,
@@ -333,6 +332,7 @@ class AuthViewModel: ObservableObject {
         return data
     }
 
+    // Converts Firestore dictionary → User model
     private func userFromFirestore(_ data: [String: Any]) -> User? {
         guard
             let idString = data["id"] as? String,

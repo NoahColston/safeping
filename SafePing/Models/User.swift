@@ -1,13 +1,21 @@
-// SafePing — User.swift
-// Core domain models: UserRole enum and User struct stored in Firestore.
-// [OOP] User is a value type (struct) with an auto-generated UUID identity.
+// SafePing  User.swift
 
+// Defines the core user models
+// Includes user roles and user data stored in Firestore
+//
 import Foundation
 
+// UserRole
+// Represents the type of user in the system
+//
+// - checker: monitors another users check ins
+// - checkInUser: performs check ins
+//
 enum UserRole: String, Codable {
     case checker
     case checkInUser
 
+    // Display name for UI
     var displayName: String {
         switch self {
         case .checker: return "Checker"
@@ -15,6 +23,7 @@ enum UserRole: String, Codable {
         }
     }
 
+    // Description shown in UI
     var description: String {
         switch self {
         case .checker:
@@ -24,6 +33,7 @@ enum UserRole: String, Codable {
         }
     }
 
+    // Icon name used in UI
     var iconName: String {
         switch self {
         case .checker: return "eye.circle.fill"
@@ -32,12 +42,30 @@ enum UserRole: String, Codable {
     }
 }
 
+// Struct: User
+// Represents a user account
+//
+// Properties:
+// - id: unique user identifier
+// - username: login username
+// - password: user password
+// - role: optional user role 
+//
 struct User: Identifiable, Codable {
     let id: UUID
     var username: String
     var password: String
     var role: UserRole?
 
+    // Initializer
+    // Creates a new user
+    //
+    // Parameters:
+    // - id: optional custom ID
+    // - username: user login name
+    // - password: user password
+    // - role: optional role assignment
+    //
     init(id: UUID = UUID(), username: String, password: String, role: UserRole? = nil) {
         self.id = id
         self.username = username

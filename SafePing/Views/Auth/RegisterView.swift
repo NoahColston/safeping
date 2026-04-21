@@ -1,7 +1,7 @@
-// SafePing — RegisterView.swift
-// New account registration. Hashes the password via CryptoUtils before
-// passing it to AuthViewModel so plaintext never reaches Firestore.
-// [OOP] Delegates persistence to AuthViewModel.
+// SafePing  RegisterView.swift
+// New account registration.
+
+// [OOP] Delegates authentication and persistence logic to AuthViewModel
 
 import SwiftUI
 
@@ -24,7 +24,7 @@ struct RegisterView: View {
 
                 BrandHeader()
 
-                // Card
+                // Card container
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Create your account")
@@ -35,7 +35,7 @@ struct RegisterView: View {
                             .foregroundColor(.safePingTextMuted)
                     }
 
-                    // Server-side error
+                    // Server-side error message
                     if let error = authViewModel.errorMessage {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.circle.fill")
@@ -83,7 +83,7 @@ struct RegisterView: View {
                         attemptRegistration()
                     }
 
-                    // Back to login
+                    // Navigation back to login
                     HStack {
                         Spacer()
                         Text("Already have an account?")
@@ -128,7 +128,7 @@ struct RegisterView: View {
     }
 
     private func attemptRegistration() {
-        // Clear previous errors
+        // Clear previous field errors
         usernameError = nil
         passwordError = nil
         confirmError = nil
@@ -144,7 +144,7 @@ struct RegisterView: View {
             passwordError = result.passwordError
             confirmError = result.confirmPasswordError
         }
-        // If valid, AuthViewModel auto-logs in and ContentView switches to HomeView
+        // If valid, AuthViewModel handles login and navigation to main flow
     }
 }
 

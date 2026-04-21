@@ -1,7 +1,7 @@
-// SafePing — CheckInViewModel.swift
-// Drives both dashboard views: loads pairings, performs check-ins, and manages
-// Firestore listeners. Acts as the single source of truth for pairing state.
-// [OOP] @MainActor ObservableObject; all mutations publish on the main thread.
+// SafePing  CheckInViewModel.swift
+// Drives both dashboard views: loads pairings, performs check ins, and manages
+// Firestore listeners acts as the single source of truth for pairing state
+// [OOP] @MainActor ObservableObject; all mutations publish on the main thread
 
 import Foundation
 import SwiftUI
@@ -31,7 +31,7 @@ class CheckInViewModel: ObservableObject {
         return pairings.firstIndex { $0.id == id }
     }
     
-    // MARK: - Stop all listeners
+    // [PROCEDURAL] performs side effect cleanup of active Firestore listeners
     func stopListening() {
         pairsListener?.remove()
         pairsListener = nil
@@ -39,7 +39,7 @@ class CheckInViewModel: ObservableObject {
         checkInListeners.removeAll()
     }
     
-    // MARK: - Load data and start live listeners
+    // [PROCEDURAL] orchestrates async Firestore fetch + listener setup
     func loadData(for username: String, role: UserRole) async {
         isLoading = true
         errorMessage = nil
@@ -80,8 +80,6 @@ class CheckInViewModel: ObservableObject {
             return
         }
         
-        // Build the new pairings list, preserving any check-ins we've already
-        // loaded so the calendar doesn't flicker between snapshots.
         var loadedPairings: [Pairing] = []
         for doc in documents {
             let data = doc.data()
@@ -116,7 +114,6 @@ class CheckInViewModel: ObservableObject {
             ))
         }
         
-        // Diff against current pairings to start/stop per-pairing check-in listeners
         let oldIds = Set(pairings.map { $0.id })
         let newIds = Set(loadedPairings.map { $0.id })
         
@@ -126,29 +123,17 @@ class CheckInViewModel: ObservableObject {
             selectedPairingId = pairings.first?.id
         }
         
-        // Stop listeners for pairings that were removed
         for removedId in oldIds.subtracting(newIds) {
             checkInListeners[removedId]?.remove()
             checkInListeners.removeValue(forKey: removedId)
         }
         
-        // Ensure every current pairing has an active listener.
-        // This also fixes reloads after stopListening().
         for pairing in pairings {
             if checkInListeners[pairing.id] == nil {
                 startCheckInListener(for: pairing)
             }
         }
         
-        // Client-side missed-day backfill (fires once when checkee opens app).
-        // We fetch existing check-ins with a one-shot getDocuments() BEFORE
-        // running the backfill. This guarantees processMissedDays sees the
-        // real Firestore records rather than racing with the async snapshot
-        // listener whose initial callback hasn't fired yet.
-        //
-        // Both methods use pairing IDs (not array indices) to look up data,
-        // because the pairings array can be mutated by the snapshot listener
-        // while we're suspended on an await.
         if role == .checkInUser {
             let pairingIds = pairings.map { $0.id }
             for pairingId in pairingIds {
@@ -158,10 +143,7 @@ class CheckInViewModel: ObservableObject {
         }
     }
     
-    // MARK: - One-shot check-in fetch (ensures backfill sees real data)
-    /// Performs a single `getDocuments` query to populate check-ins for the
-    /// given pairing. Called before `processMissedDays` so the backfill has
-    /// the actual Firestore records to compare against.
+    // [PROCEDURAL] async Firestore fetch used for state hydration
     private func fetchCheckInsOnce(for pairingId: UUID) async {
         guard let index = pairings.firstIndex(where: { $0.id == pairingId }) else { return }
         let pairing = pairings[index]
@@ -196,18 +178,15 @@ class CheckInViewModel: ObservableObject {
                 )
             }
 
-            // Re-lookup index after the await — the array may have shifted.
             guard let freshIndex = pairings.firstIndex(where: { $0.id == pairingId }) else { return }
             pairings[freshIndex].checkIns = checkIns
             pairings[freshIndex].currentStreak = recomputeStreak(for: pairings[freshIndex])
         } catch {
-            // Non-fatal: if the fetch fails the listener will deliver data
-            // eventually, and backfill will run against whatever is in memory.
             print("fetchCheckInsOnce failed for pairing \(pairingId.uuidString): \(error.localizedDescription)")
         }
     }
 
-    // MARK: - Process missed days on app foreground
+    // [PROCEDURAL] backfill mutation of Firestore + local state
     private func processMissedDays(for pairingId: UUID, username: String) async {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -221,8 +200,6 @@ class CheckInViewModel: ObservableObject {
         let lookbackStart = max(thirtyDaysAgo, pairedDay)
         var newCheckIns: [CheckIn] = []
 
-        // Walk each schedule independently so every slot gets its own
-        // missed record when no check-in exists for that (day, slot).
         for schedule in pairing.schedules {
             let recordedDays: Set<Date> = Set(
                 pairing.checkIns
@@ -248,7 +225,6 @@ class CheckInViewModel: ObservableObject {
 
         guard !newCheckIns.isEmpty else { return }
 
-        // Re-lookup index after the guard — safe before the await below.
         guard let freshIndex = pairings.firstIndex(where: { $0.id == pairingId }) else { return }
         pairings[freshIndex].checkIns.append(contentsOf: newCheckIns)
         let newStreak = recomputeStreak(for: pairings[freshIndex])
@@ -273,7 +249,7 @@ class CheckInViewModel: ObservableObject {
                 ]
                 try await db.collection("checkIns").document(canonicalDocId).setData(data)
             }
-            // Re-lookup after the await loop for the streak update.
+
             if let idx = pairings.firstIndex(where: { $0.id == pairingId }) {
                 let streak = recomputeStreak(for: pairings[idx])
                 pairings[idx].currentStreak = streak
@@ -286,15 +262,14 @@ class CheckInViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Live listener for a checkee's check-ins
+    // [OOP] maintains live synchronization with Firestore
     private func startCheckInListener(for pairing: Pairing) {
-        // avoid duplicate listeners
         checkInListeners[pairing.id]?.remove()
         
         let listener = db.collection("checkIns")
             .whereField("pairingId", isEqualTo: pairing.id.uuidString)
             .order(by: "date", descending: true)
-            .limit(to: 365) // currently limits streak to 365 days
+            .limit(to: 365)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
                 
@@ -306,7 +281,6 @@ class CheckInViewModel: ObservableObject {
                     return
                 }
                 guard let documents = snapshot?.documents else {
-                    print("No snapshot returned for pairing:", pairing.id.uuidString)
                     Task { @MainActor in
                         self.errorMessage = "No snapshot returned for \(pairing.checkInUsername)."
                     }
@@ -338,12 +312,6 @@ class CheckInViewModel: ObservableObject {
                 }
                 
                 Task { @MainActor in
-                    if checkIns.count != documents.count {
-                        self.errorMessage = "Loaded \(checkIns.count) of \(documents.count) check-ins for \(pairing.checkInUsername). Some documents may be malformed."
-                    } else {
-                        self.errorMessage = nil
-                    }
-
                     guard let index = self.pairings.firstIndex(where: { $0.id == pairing.id }) else { return }
 
                     var updatedPairings = self.pairings
@@ -356,17 +324,11 @@ class CheckInViewModel: ObservableObject {
         checkInListeners[pairing.id] = listener
     }
     
-    // --- Scheduling methods --
-    
-    
-    // MARK: - Select Pairing
     func selectPairing(_ pairing: Pairing) {
         selectedPairingId = pairing.id
     }
     
-    // MARK: - Schedule CRUD
-
-    /// Add a new default schedule to the selected pairing.
+    // [PROCEDURAL] state mutation + persistence
     func addSchedule(to pairingId: UUID? = nil) {
         let targetId = pairingId ?? selectedPairingId
         guard let id = targetId,
@@ -441,7 +403,7 @@ class CheckInViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Story 13: Unpair a user
+    // [PROCEDURAL] external service call + local cleanup
     func unpairUser(_ pairing: Pairing) async {
         do {
             try await pairingService.removePairing(pairingId: pairing.id)
@@ -456,11 +418,7 @@ class CheckInViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Streak calculation
-    /// Walks backward from today counting consecutive scheduled days where
-    /// every slot was checked in. Days with no scheduled slots are skipped.
-    /// For the current day,if its slots aren't all done yet, we don't count it but also don't
-    /// dont treat it as a break, so an in-progress day does not reset the streak.
+    // [FUNCTIONAL] pure computation derived from state (no side effects)
     private func recomputeStreak(for pairing: Pairing) -> Int {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -475,7 +433,6 @@ class CheckInViewModel: ObservableObject {
 
             let activeSchedules = pairing.schedules(forDate: cursor)
             if activeSchedules.isEmpty {
-                // No obligations this day —> skip without counting or breaking.
                 guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
                 cursor = prev
                 isToday = false
@@ -489,13 +446,8 @@ class CheckInViewModel: ObservableObject {
             if allCheckedIn {
                 streak += 1
             } else if !isToday {
-                // Any prior day with scheduled check-ins that is not fully complete
-                // ends the streak.
                 break
             }
-            // else:
-            // today has scheduled check-ins, but is not fully complete yet
-            // -> do not count it, and do not break the streak
 
             guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
             cursor = prev
@@ -505,7 +457,7 @@ class CheckInViewModel: ObservableObject {
         return streak
     }
     
-    // MARK: - Perform Check-In (saves to Firebase)
+    // [PROCEDURAL] state mutation + async persistence side effects
     func performCheckIn(
         username: String,
         scheduleId: UUID,
@@ -516,7 +468,6 @@ class CheckInViewModel: ObservableObject {
         else { return }
         let today = Date()
         
-        // reject check-ins outside the allowed window
         if let schedule = pairings[index].schedules.first(where: { $0.id == scheduleId }) {
             let calendar = Calendar.current
             var components = calendar.dateComponents([.year, .month, .day], from: today)
@@ -536,12 +487,12 @@ class CheckInViewModel: ObservableObject {
             }
         }
 
-        // Remove any pending/missed placeholder for this slot today
         pairings[index].checkIns.removeAll { ci in
             Calendar.current.isDate(ci.date, inSameDayAs: today)
                 && (ci.scheduleId == scheduleId || ci.scheduleId == nil)
                 && ci.status != .checkedIn
         }
+
         let newCheckIn = CheckIn(
             pairingId: pairingId,
             scheduleId: scheduleId,
@@ -550,14 +501,13 @@ class CheckInViewModel: ObservableObject {
             latitude: location?.latitude,
             longitude: location?.longitude
         )
+
         pairings[index].checkIns.insert(newCheckIn, at: 0)
 
         let newStreak = recomputeStreak(for: pairings[index])
         pairings[index].currentStreak = newStreak
 
         do {
-            // Doc ID bucketed by (pairing, schedule, day) — repeated taps
-            // on the same slot overwrite rather than duplicate.
             let dayKey = Int(Calendar.current.startOfDay(for: today).timeIntervalSince1970)
             let docId = "\(pairingId.uuidString)_\(scheduleId.uuidString)_\(dayKey)"
 
@@ -577,7 +527,6 @@ class CheckInViewModel: ObservableObject {
 
             try await db.collection("checkIns").document(docId).setData(data)
 
-            // Re-lookup after await — the array may have shifted.
             if let freshIndex = pairings.firstIndex(where: { $0.id == pairingId }) {
                 let freshStreak = recomputeStreak(for: pairings[freshIndex])
                 pairings[freshIndex].currentStreak = freshStreak
@@ -590,7 +539,7 @@ class CheckInViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Time Helpers
+    // [FUNCTIONAL] pure formatting utilities
 
     static func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -598,8 +547,6 @@ class CheckInViewModel: ObservableObject {
         return formatter.string(from: date)
     }
 
-    // Returns true if the current time is within the check-in window
-    // (no earlier than 15 minutes before the scheduled time).
     func isCheckInAvailable(for schedule: CheckInSchedule) -> Bool {
         let now = Date()
         let calendar = Calendar.current
@@ -611,7 +558,6 @@ class CheckInViewModel: ObservableObject {
         return now >= earliestAllowed
     }
 
-    // Human-readable string for when check-in opens (15 min before scheduled time).
     func checkInOpensAt(for schedule: CheckInSchedule) -> String {
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day], from: Date())

@@ -1,6 +1,7 @@
-// SafePing — CheckerDashboardView.swift
-// Dashboard for checkers: shows paired users, their status, calendar, and map.
-// [OOP] Delegates data fetching and pairing mutations to CheckInViewModel.
+// SafePing CheckerDashboardView.swift
+// Dashboard for checkers
+
+// [OOP] Delegates data fetching and pairing mutations to CheckInViewModel
 
 import SwiftUI
 import MapKit
@@ -10,6 +11,7 @@ struct CheckerDashboardView: View {
     @EnvironmentObject var notificationService: NotificationService
     @StateObject private var checkInViewModel = CheckInViewModel()
 
+    // UI state for pairing flow, dialogs, and navigation
     @State private var showAddPairing = false
     @State private var showUnpairConfirm = false
     @State private var pairingToRemove: Pairing?
@@ -18,6 +20,8 @@ struct CheckerDashboardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+
+            // Top header area: app branding ,contextual greeting
             VStack(spacing: 8) {
                 HStack(spacing: 0) {
                     Text("Safe")
@@ -36,7 +40,8 @@ struct CheckerDashboardView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 16)
-            
+
+            // Global error display from CheckInViewModel
             if let error = checkInViewModel.errorMessage {
                 Text(error)
                     .font(.footnote)
@@ -45,6 +50,8 @@ struct CheckerDashboardView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 8)
             }
+
+            // Main tab routing for dashboard sections
             if selectedTab == 2 {
                 CheckerMapView(checkInViewModel: checkInViewModel)
             } else if selectedTab == 1 {
@@ -52,21 +59,17 @@ struct CheckerDashboardView: View {
             } else if selectedTab == 3 {
                 SettingsView()
             } else {
+
+                // Default dashboard tab
                 ScrollView {
                     VStack(spacing: 16) {
-                        // Greeting
-                        VStack(spacing: 4) {
-                            Text("Hey, \(authViewModel.currentUser?.username ?? "there")!")
-                                .font(.system(size: 26, weight: .bold, design: .rounded))
-                                .foregroundColor(.safePingDark)
-                        }
-                        .padding(.top, 8)
-                        // Story 12: User tabs row + "+" add button
                         if checkInViewModel.pairings.isEmpty {
                             checkerEmptyState
                                 .padding(.horizontal, 20)
                                 .padding(.top, 8)
                         }
+
+                        // Horizontal selector for switching between paired users
                         else {
                             HStack(spacing: 0) {
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -83,8 +86,8 @@ struct CheckerDashboardView: View {
                                     .padding(.leading, 20)
                                     .padding(.trailing, 4)
                                 }
-                                
-                                
+
+                                // Add new pairing action
                                 Button(action: { showAddPairing = true }) {
                                     Image(systemName: "plus.circle.fill")
                                         .font(.system(size: 26))
@@ -94,22 +97,26 @@ struct CheckerDashboardView: View {
                                 .padding(.leading, 8)
                             }
                         }
-                        
+
+                        // Selected user detail stack
                         if let pairing = checkInViewModel.selectedPairing {
-                            // Status card with Story 13 unpair button
+
+                            // Live status summary card (includes unpair action)
                             StatusCard(pairing: pairing) {
                                 pairingToRemove = pairing
                                 showUnpairConfirm = true
                             }
                             .padding(.horizontal, 20)
-                            
+
+                            // Calendar view showing check in history
                             CheckInCalendarView(pairing: pairing)
                                 .padding(.horizontal, 20)
-                            
+
+                            // Schedule configuration for check ins
                             CheckInSettingsView(viewModel: checkInViewModel)
                                 .padding(.horizontal, 20)
                         }
-                        
+
                         Spacer().frame(height: 20)
                     }
                     .padding(.top, 8)
@@ -120,6 +127,8 @@ struct CheckerDashboardView: View {
                     }
                 }
             }
+
+            // Persistent bottom navigation bar
             BottomTabBar(
                 selectedTab: $selectedTab,
                 icons: ["house.fill", "exclamationmark.triangle.fill", "map.fill", "gearshape.fill"]
@@ -133,7 +142,8 @@ struct CheckerDashboardView: View {
                 }
             }
         }
-        // Story 12: Sheet to add a new pairing
+
+        // for creating a new pairing via code
         .sheet(isPresented: $showAddPairing, onDismiss: {
             if let user = authViewModel.currentUser {
                 Task {
@@ -145,7 +155,8 @@ struct CheckerDashboardView: View {
                 .environmentObject(authViewModel)
                 .environmentObject(notificationService)
         }
-        // Story 13: Unpair confirmation
+
+        // dialog for unpairing a user
         .confirmationDialog(
             "Remove \(pairingToRemove?.checkInUsername ?? "this user")?",
             isPresented: $showUnpairConfirm,
@@ -161,6 +172,8 @@ struct CheckerDashboardView: View {
             Text("They will no longer appear in your dashboard.")
         }
     }
+
+    // Empty state shown when no pairings exist
     private var checkerEmptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "person.badge.plus")
@@ -194,10 +207,9 @@ struct CheckerDashboardView: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
     }
-    
 }
 
-// MARK: User Tab Pill
+// Small selectable pill used to switch between paired users
 struct UserTab: View {
     let name: String
     let isSelected: Bool
@@ -217,7 +229,7 @@ struct UserTab: View {
     }
 }
 
-// MARK: Status Card (Story 13: onUnpair callback)
+// Displays latest activity + streak + allows unpair action
 struct StatusCard: View {
     let pairing: Pairing
     let onUnpair: () -> Void
@@ -260,7 +272,7 @@ struct StatusCard: View {
     }
 }
 
-// MARK: Story 12: Add Pairing Sheet (checker adds another check-in user)
+// Handles redeeming a 6-digit pairing code
 struct AddPairingSheet: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var vm = PairingViewModel()
@@ -360,7 +372,7 @@ struct AddPairingSheet: View {
     }
 }
 
-// MARK: Bottom Tab Bar
+// Persistent navigation control across main dashboard sections
 struct BottomTabBar: View {
     @Binding var selectedTab: Int
     var icons: [String] = ["house.fill", "person.2.fill", "map.fill", "gearshape.fill"]

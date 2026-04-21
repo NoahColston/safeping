@@ -1,7 +1,6 @@
-// SafePing — LoginView.swift
-// Username + password login screen. Uses SafePingTextField (Theme.swift) so the
-// password field gets the eye-icon toggle for free.
-// [OOP] Delegates auth logic to AuthViewModel via @EnvironmentObject.
+// SafePing  LoginView.swift
+// Username + password login screen
+// [OOP] Delegates authentication logic to AuthViewModel @EnvironmentObject.
 
 import SwiftUI
 
@@ -18,7 +17,7 @@ struct LoginView: View {
 
                 BrandHeader()
 
-                // Card
+                // Card container
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Welcome back")
@@ -29,7 +28,7 @@ struct LoginView: View {
                             .foregroundColor(.safePingTextMuted)
                     }
 
-                    // Error alert
+                    // Error message display
                     if let error = authViewModel.errorMessage {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.circle.fill")
@@ -61,7 +60,7 @@ struct LoginView: View {
                         authViewModel.login(username: username, password: password)
                     }
 
-                    // Register link
+                    // Navigation to registration
                     HStack {
                         Spacer()
                         Text("Don't have an account?")

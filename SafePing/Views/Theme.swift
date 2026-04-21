@@ -1,28 +1,29 @@
-// SafePing — Theme.swift
-// Centralizes the app's color palette, typography helpers, and reusable input
-// components (SafePingTextField with optional eye-icon password toggle).
-// [Functional] Color constants are pure static values; no mutable state.
+// SafePing Theme.swift
+// Centralizes app styling: colors, reusable gradient, text field, and button components
 
 import SwiftUI
 
 extension Color {
-    // Primary green gradient endpoints from logo SVG
-    static let safePingGreenStart = Color(red: 107/255, green: 212/255, blue: 37/255)   // #6BD425
-    static let safePingGreenEnd   = Color(red: 61/255,  green: 166/255, blue: 0/255)    // #3DA600
-    static let safePingGreenMid   = Color(red: 82/255,  green: 185/255, blue: 21/255)   // #52B915
+    // Primary brand green gradient
+    static let safePingGreenStart = Color(red: 107/255, green: 212/255, blue: 37/255)
+    static let safePingGreenEnd   = Color(red: 61/255,  green: 166/255, blue: 0/255)
+    static let safePingGreenMid   = Color(red: 82/255,  green: 185/255, blue: 21/255)
 
-    // Dark charcoal from pin
-    static let safePingDark       = Color(red: 26/255,  green: 26/255,  blue: 26/255)   // #1A1A1A
+    // Primary dark text color
+    static let safePingDark       = Color(red: 26/255,  green: 26/255,  blue: 26/255)
 
-    // Supporting palette
-    static let safePingBg         = Color(red: 247/255, green: 248/255, blue: 246/255)  // #F7F8F6
-    static let safePingTextMuted  = Color(red: 113/255, green: 117/255, blue: 110/255)  // #71756E
-    static let safePingBorder     = Color(red: 224/255, green: 226/255, blue: 220/255)  // #E0E2DC
-    static let safePingError      = Color(red: 214/255, green: 57/255,  blue: 43/255)   // #D6392B
-    static let safePingErrorBg    = Color(red: 254/255, green: 240/255, blue: 238/255)  // #FEF0EE
-    static let safePingSuccessBg  = Color(red: 234/255, green: 250/255, blue: 222/255)  // #EAFADE
+    // Background and UI system colors
+    static let safePingBg         = Color(red: 247/255, green: 248/255, blue: 246/255)
+    static let safePingTextMuted  = Color(red: 113/255, green: 117/255, blue: 110/255)
+    static let safePingBorder     = Color(red: 224/255, green: 226/255, blue: 220/255)
+
+    // Error + success states
+    static let safePingError      = Color(red: 214/255, green: 57/255,  blue: 43/255)
+    static let safePingErrorBg    = Color(red: 254/255, green: 240/255, blue: 238/255)
+    static let safePingSuccessBg  = Color(red: 234/255, green: 250/255, blue: 222/255)
 }
 
+// Reusable brand gradient component
 struct SafePingGradient: View {
     var body: some View {
         LinearGradient(
@@ -33,7 +34,7 @@ struct SafePingGradient: View {
     }
 }
 
-// MARK: - Reusable styled text field
+// Reusable styled text field with optional password toggle
 struct SafePingTextField: View {
     let label: String
     let placeholder: String
@@ -44,6 +45,7 @@ struct SafePingTextField: View {
     @FocusState private var isFocused: Bool
     @State private var showPassword = false
 
+    // Switches between SecureField and TextField based on visibility state
     @ViewBuilder private var fieldInput: some View {
         if isSecure && !showPassword {
             SecureField(placeholder, text: $text)
@@ -56,11 +58,14 @@ struct SafePingTextField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+
+            // Field label
             Text(label.uppercased())
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.safePingTextMuted)
                 .tracking(0.5)
 
+            // Input field container
             fieldInput
                 .padding(14)
                 .padding(.trailing, isSecure ? 44 : 0)
@@ -75,6 +80,8 @@ struct SafePingTextField: View {
                         )
                 )
                 .focused($isFocused)
+
+                // Eye toggle for secure fields
                 .overlay(alignment: .trailing) {
                     if isSecure {
                         Button(action: { showPassword.toggle() }) {
@@ -86,17 +93,17 @@ struct SafePingTextField: View {
                     }
                 }
 
+            // Error message
             if let error = errorMessage {
                 Text(error)
                     .font(.system(size: 12))
                     .foregroundColor(.safePingError)
-                    .transition(.opacity)
             }
         }
     }
 }
 
-// MARK: - Primary button with green gradient
+// Primary call to action button with gradient styling
 struct SafePingButton: View {
     let title: String
     var isLoading: Bool = false
@@ -104,10 +111,11 @@ struct SafePingButton: View {
 
     var body: some View {
         Button(action: { if !isLoading { action() } }) {
+
+            // Switches between text and spinner
             Group {
                 if isLoading {
-                    ProgressView()
-                        .tint(.white)
+                    ProgressView().tint(.white)
                 } else {
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
@@ -115,10 +123,14 @@ struct SafePingButton: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 50)  // fixed height so the button doesn't resize when spinner appears
+            .frame(height: 50) // keeps layout stable during loading
             .background(SafePingGradient())
             .cornerRadius(10)
-            .shadow(color: .safePingGreenEnd.opacity(isLoading ? 0.1 : 0.25), radius: 6, y: 3)
+            .shadow(
+                color: .safePingGreenEnd.opacity(isLoading ? 0.1 : 0.25),
+                radius: 6,
+                y: 3
+            )
             .opacity(isLoading ? 0.8 : 1.0)
         }
         .disabled(isLoading)

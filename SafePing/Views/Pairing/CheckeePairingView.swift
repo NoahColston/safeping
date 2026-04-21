@@ -1,11 +1,13 @@
-// SafePing — CheckeePairingView.swift
-// Shows the 6-digit pairing code for the check-in user to share with their checker.
-// [OOP] PairingViewModel generates and stores the code in Firestore.
+// SafePing  CheckeePairingView.swift
+// Shows the 6-igit pairing code for the check in user to share with their checker
+// PairingViewModel generates and stores the code in Firestore
 
 import SwiftUI
 
 struct CheckeePairingView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    
+    // Handles generating the code and loading/error state and Firestore sync
     @StateObject private var viewModel = PairingViewModel()
     
     var body: some View {
@@ -27,11 +29,12 @@ struct CheckeePairingView: View {
                     .padding(.horizontal)
             }
             
+            // Show loading while code is being generated/fetched
             if viewModel.isLoading {
                 ProgressView()
                     .scaleEffect(1.5)
             } else {
-                // Big code display
+                // Main pairing code display
                 Text(viewModel.generatedCode)
                     .font(.system(size: 52, weight: .bold, design: .monospaced))
                     .tracking(8)
@@ -40,7 +43,7 @@ struct CheckeePairingView: View {
                     .background(Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 
-                // Share button
+                // Share system sheet for sending code to checker
                 ShareLink(item: "My Safe Ping pairing code is: \(viewModel.generatedCode)") {
                     Label("Share Code", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
@@ -51,7 +54,7 @@ struct CheckeePairingView: View {
                 }
                 .padding(.horizontal)
                 
-                // Regenerate
+                // Regenerate a new pairing code if needed
                 Button("Generate a new code") {
                     Task {
                         await viewModel.generateCode(
@@ -63,6 +66,7 @@ struct CheckeePairingView: View {
                 .foregroundStyle(.secondary)
             }
             
+            // Show error if Firestore or generation fails
             if let error = viewModel.errorMessage {
                 Text(error)
                     .font(.footnote)
@@ -72,6 +76,7 @@ struct CheckeePairingView: View {
             
             Spacer()
             
+            // Finish onboarding step and enter app
             Button {
                 authViewModel.completePairing()
             } label: {
@@ -85,6 +90,7 @@ struct CheckeePairingView: View {
             .padding(.horizontal)
             .padding(.bottom)
         }
+        // Auto generate code when screen appears
         .task {
             await viewModel.generateCode(
                 for: authViewModel.currentUser?.username ?? ""

@@ -1,18 +1,29 @@
-// SafePing — CryptoUtils.swift
-// Shared cryptographic helpers. Centralizes password hashing so both
-// AuthViewModel and SeedService produce identical digests.
+// SafePing  CryptoUtils.swift
 
+// Provides helper functions for cryptographic operations
+// Used to hash passwords consistently across the app
+//
 import Foundation
 import CryptoKit
 
-// [OOP] Namespace enum — groups related utility functions without instantiation
+// CryptoUtils
+// Utility container for cryptographic functions.
+//
 enum CryptoUtils {
 
-    // [Procedural] Utility: one-way SHA-256 digest used for password storage
+    // hashPassword
+    // Converts a password into a SHA-256 hashed string.
+    //
+    // Parameters:
+    // - password: plain text password
+    //
+    // Returns:
+    // - hashed password as a hex string
+    //
     static func hashPassword(_ password: String) -> String {
         let data = Data(password.utf8)
         let hash = SHA256.hash(data: data)
-        // [Functional] compactMap transforms each byte into a hex string
+
         return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
 }

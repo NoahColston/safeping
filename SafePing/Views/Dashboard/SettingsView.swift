@@ -1,14 +1,19 @@
 // SafePing — SettingsView.swift
-// App settings: account info, notifications, about, sign-out, and (debug) seed controls.
+// App settings: account info, notifications, about, sign out, and seed controls
+// [UI Layer] Pure SwiftUI view driven by AuthViewModel and NotificationService state
 
 import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var notificationService: NotificationService
+
+    //Service used to populate mock data for development/testing
     @StateObject private var seedService = SeedService()
 
+    // Controls confirmation dialog for destructive account deletion
     @State private var showDeleteConfirm = false
+
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -20,11 +25,14 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView {
+
+            // Main vertical stack for grouped settings sections
             VStack(spacing: 24) {
 
-                // MARK: - Account
+                // MARK: - Account Section (user identity + role display)
                 SettingsSection(title: "Account") {
-                    // Username
+
+                    // Displays current logged-in username
                     SettingsRow(
                         icon: "person.fill",
                         iconColor: .safePingGreenMid,
@@ -37,7 +45,7 @@ struct SettingsView: View {
 
                     Divider().padding(.leading, 52)
 
-                    // Role
+                    // Displays user role
                     SettingsRow(
                         icon: authViewModel.currentUser?.role?.iconName ?? "questionmark",
                         iconColor: .safePingGreenMid,
@@ -51,10 +59,13 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: - Notifications (check-in users only)
+                // Shown only when notifications are disabled at system level
                 if authViewModel.currentUser?.role == .checkInUser &&
                    notificationService.permissionStatus == .denied {
+
                     SettingsSection(title: "Notifications") {
+
+                        // Redirects user to iOS Settings app to enable notifications
                         Button(action: {
                             if let url = URL(string: UIApplication.openSettingsURLString) {
                                 UIApplication.shared.open(url)
@@ -69,6 +80,7 @@ struct SettingsView: View {
                                     Text("Open Settings")
                                         .font(.system(size: 13))
                                         .foregroundColor(.safePingGreenEnd)
+
                                     Image(systemName: "arrow.up.right")
                                         .font(.system(size: 11))
                                         .foregroundColor(.safePingGreenEnd)
@@ -79,8 +91,9 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: - About
                 SettingsSection(title: "About") {
+
+                    // App version/build display
                     SettingsRow(
                         icon: "info.circle.fill",
                         iconColor: .safePingTextMuted,
@@ -93,6 +106,7 @@ struct SettingsView: View {
 
                     Divider().padding(.leading, 52)
 
+                    // Support email link
                     Link(destination: URL(string: "mailto:support@safeping.app")!) {
                         SettingsRow(
                             icon: "envelope.fill",
@@ -107,9 +121,10 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                 }
 
-                // MARK: - Developer (sample data seed)
                 #if DEBUG
                 SettingsSection(title: "Developer") {
+
+                    // Seeds sample users into backend for testing flows
                     Button(action: {
                         Task { await seedService.seedSampleUsers() }
                     }) {
@@ -130,6 +145,7 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                     .disabled(seedService.isSeeding)
 
+                    // Debug feedback from seeding process
                     if let msg = seedService.seedMessage {
                         Text(msg)
                             .font(.system(size: 12))
@@ -140,11 +156,13 @@ struct SettingsView: View {
                 }
                 #endif
 
-                // MARK: - Danger Zone
                 SettingsSection(title: "Account Actions") {
+
+                    // Sign out: clears session and cancels scheduled notifications
                     Button(action: {
                         notificationService.cancelAllNotifications()
-                        authViewModel.logout() }) {
+                        authViewModel.logout()
+                    }) {
                         SettingsRow(
                             icon: "rectangle.portrait.and.arrow.right",
                             iconColor: .safePingError,
@@ -157,7 +175,10 @@ struct SettingsView: View {
 
                     Divider().padding(.leading, 52)
 
-                    Button(action: { showDeleteConfirm = true }) {
+                    // Delete account trigger
+                    Button(action: {
+                        showDeleteConfirm = true
+                    }) {
                         SettingsRow(
                             icon: "trash.fill",
                             iconColor: .safePingError,
@@ -181,7 +202,10 @@ struct SettingsView: View {
             .padding(.horizontal, 20)
             .padding(.top, 16)
         }
+
+        // Background styling for entire settings screen
         .background(Color.safePingBg.ignoresSafeArea())
+
         .confirmationDialog(
             "Delete your account?",
             isPresented: $showDeleteConfirm,
@@ -197,19 +221,23 @@ struct SettingsView: View {
         } message: {
             Text("This will permanently remove your account and all check-in history. This cannot be undone.")
         }
+
+        // Refresh notification permission state when view appears
         .task {
             await notificationService.refreshPermissionStatus()
         }
     }
 }
 
-// MARK: - Settings Section Container
+// Reusable grouped container for settings categories
 struct SettingsSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+
+            // Section header label
             Text(title.uppercased())
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.safePingTextMuted)
@@ -217,6 +245,7 @@ struct SettingsSection<Content: View>: View {
                 .padding(.horizontal, 4)
                 .padding(.bottom, 8)
 
+            // Card style container for grouped rows
             VStack(spacing: 0) {
                 content
             }
@@ -227,7 +256,7 @@ struct SettingsSection<Content: View>: View {
     }
 }
 
-// MARK: - Settings Row
+// Reusable row component used across all settings sections
 struct SettingsRow<Trailing: View>: View {
     let icon: String
     let iconColor: Color
@@ -236,6 +265,8 @@ struct SettingsRow<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: 14) {
+
+            // Icon container
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(iconColor.opacity(0.12))
@@ -246,12 +277,14 @@ struct SettingsRow<Trailing: View>: View {
                     .foregroundColor(iconColor)
             }
 
+            // Main label text
             Text(label)
                 .font(.system(size: 15))
                 .foregroundColor(.safePingDark)
 
             Spacer()
 
+            // Right side content
             trailing
         }
         .padding(.horizontal, 16)
@@ -263,6 +296,7 @@ struct SettingsRow<Trailing: View>: View {
     let auth = AuthViewModel()
     auth.currentUser = User(username: "noah", password: "", role: .checkInUser)
     auth.isAuthenticated = true
+
     return SettingsView()
         .environmentObject(auth)
         .environmentObject(NotificationService())
