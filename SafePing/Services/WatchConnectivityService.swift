@@ -11,6 +11,7 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
 
     private let db = Firestore.firestore()
 
+    
     /// Cached pairings so we can re-send to the watch when it becomes
     /// reachable without needing the dashboard to be on screen.
     private var cachedPairings: [Pairing] = []
@@ -33,33 +34,124 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
         pushNextCheckIn()
     }
 
-    /// Sends the cached next check-in time to the watch.
+    /// Sends the cached next check-in status to the watch.
+    /// Now sends a richer dictionary with a `status` field so the watch
+    /// can display distinct UI for each state.
     private func pushNextCheckIn() {
         guard WCSession.default.isReachable else { return }
 
-        // Find the earliest upcoming scheduled time across all pairings.
-        let nextTimes = cachedPairings.compactMap { $0.nextScheduledOccurrence }
-        guard let earliest = nextTimes.min() else {
+        let calendar = Calendar.current
+        let now = Date()
+        let formatter = DateFormatter()
+
+        // 1. Check if any slot is currently in its check-in window (ready).
+        var readySlot: (time: Date, deadline: Date)? = nil
+        for pairing in cachedPairings {
+            let todaysSchedules = pairing.schedules(forDate: now)
+            for schedule in todaysSchedules {
+                // Skip already-checked-in slots
+                if pairing.status(for: now, scheduleId: schedule.id) == .checkedIn {
+                    continue
+                }
+                var components = calendar.dateComponents([.year, .month, .day], from: now)
+                components.hour = schedule.hour
+                components.minute = schedule.minute
+                guard let scheduledTime = calendar.date(from: components) else { continue }
+                let earliestAllowed = calendar.date(byAdding: .minute, value: -15, to: scheduledTime)!
+                let latestAllowed = calendar.date(byAdding: .minute, value: schedule.gracePeriodMinutes, to: scheduledTime)!
+                if now >= earliestAllowed && now <= latestAllowed {
+                    if readySlot == nil || scheduledTime < readySlot!.time {
+                        readySlot = (scheduledTime, latestAllowed)
+                    }
+                }
+            }
+        }
+
+        if let slot = readySlot {
+            formatter.dateFormat = "h:mm a"
+            let timeStr = formatter.string(from: slot.time)
+            let deadlineStr = formatter.string(from: slot.deadline)
             WCSession.default.sendMessage(
-                ["nextCheckIn": "No check-ins scheduled"],
+                [
+                    "status": "ready",
+                    "nextCheckIn": timeStr,
+                    "deadline": deadlineStr
+                ],
                 replyHandler: nil,
                 errorHandler: nil
             )
             return
         }
 
-        let formatter = DateFormatter()
-        if Calendar.current.isDateInToday(earliest) {
-            formatter.dateFormat = "h:mm a"
-        } else {
-            formatter.dateFormat = "EEE h:mm a"
+        // 2. Find the next future occurrence across all pairings.
+        let nextTimes = cachedPairings.compactMap { $0.nextScheduledOccurrence }
+        guard let earliest = nextTimes.min() else {
+            // No upcoming slots at all — either no schedules or no pairings.
+            // Figure out if everything today is done vs. nothing scheduled.
+            let anyTodaySchedules = cachedPairings.contains { pairing in
+                !pairing.schedules(forDate: now).isEmpty
+            }
+            let allTodayDone = anyTodaySchedules && cachedPairings.allSatisfy { pairing in
+                let todaysSchedules = pairing.schedules(forDate: now)
+                return todaysSchedules.allSatisfy { schedule in
+                    pairing.status(for: now, scheduleId: schedule.id) == .checkedIn
+                }
+            }
+            if allTodayDone {
+                WCSession.default.sendMessage(
+                    ["status": "done", "nextCheckIn": "All done for today"],
+                    replyHandler: nil,
+                    errorHandler: nil
+                )
+            } else {
+                WCSession.default.sendMessage(
+                    ["status": "none", "nextCheckIn": "No check-ins scheduled"],
+                    replyHandler: nil,
+                    errorHandler: nil
+                )
+            }
+            return
         }
 
-        WCSession.default.sendMessage(
-            ["nextCheckIn": formatter.string(from: earliest)],
-            replyHandler: nil,
-            errorHandler: nil
-        )
+        // 3. There's a future slot — is it today or a later day?
+        let isToday = calendar.isDateInToday(earliest)
+
+        // Check if all of today's slots are already done
+        let allTodayDone = cachedPairings.allSatisfy { pairing in
+            let todaysSchedules = pairing.schedules(forDate: now)
+            guard !todaysSchedules.isEmpty else { return true }
+            return todaysSchedules.allSatisfy { schedule in
+                pairing.status(for: now, scheduleId: schedule.id) == .checkedIn
+            }
+        }
+
+        if allTodayDone && !isToday {
+            // Everything today is done; next slot is tomorrow or later.
+            formatter.dateFormat = "EEE h:mm a"
+            WCSession.default.sendMessage(
+                [
+                    "status": "done",
+                    "nextCheckIn": formatter.string(from: earliest)
+                ],
+                replyHandler: nil,
+                errorHandler: nil
+            )
+        } else {
+            // Waiting for a future slot (could be later today or another day).
+            if isToday {
+                formatter.dateFormat = "h:mm a"
+            } else {
+                formatter.dateFormat = "EEE h:mm a"
+            }
+            WCSession.default.sendMessage(
+                [
+                    "status": "waiting",
+                    "nextCheckIn": formatter.string(from: earliest)
+                ],
+                replyHandler: nil,
+                errorHandler: nil
+            )
+        }
     }
 
     // MARK: - Watch became reachable — push latest data
@@ -187,6 +279,9 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
                 .getDocuments()
 
             var candidates: [Date] = []
+            var hasReadySlot = false
+            var readyTime: Date?
+            var readyDeadline: Date?
 
             for pairDoc in pairsSnapshot.documents {
                 let pairData = pairDoc.data()
@@ -195,6 +290,34 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
                 let schedules = schedulesArr.map { CheckInSchedule.fromFirestore($0) }
 
                 for schedule in schedules {
+                    // Check if there's a currently-open window first
+                    let weekdayToday = calendar.component(.weekday, from: now)
+                    if schedule.isScheduled(weekday: weekdayToday) {
+                        var todayComponents = calendar.dateComponents([.year, .month, .day], from: now)
+                        todayComponents.hour = schedule.hour
+                        todayComponents.minute = schedule.minute
+                        if let scheduledTime = calendar.date(from: todayComponents) {
+                            let earliestAllowed = calendar.date(byAdding: .minute, value: -15, to: scheduledTime)!
+                            let latestAllowed = calendar.date(byAdding: .minute, value: schedule.gracePeriodMinutes, to: scheduledTime)!
+
+                            if now >= earliestAllowed && now <= latestAllowed {
+                                // Check if already checked in
+                                let dayKey = Int(calendar.startOfDay(for: now).timeIntervalSince1970)
+                                let docId = "\(pairingId)_\(schedule.id.uuidString)_\(dayKey)"
+                                let existing = try await db.collection("checkIns").document(docId).getDocument()
+                                let alreadyDone = existing.data().flatMap { $0["status"] as? String } == CheckInStatus.checkedIn.rawValue
+                                if !alreadyDone {
+                                    if readyTime == nil || scheduledTime < readyTime! {
+                                        hasReadySlot = true
+                                        readyTime = scheduledTime
+                                        readyDeadline = latestAllowed
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Also find the next future occurrence
                     for offset in 0...7 {
                         guard let day = calendar.date(byAdding: .day, value: offset, to: now) else { continue }
                         let weekday = calendar.component(.weekday, from: day)
@@ -220,20 +343,40 @@ class WatchConnectivityService: NSObject, ObservableObject, WCSessionDelegate {
                 }
             }
 
-            let message: String
-            if let earliest = candidates.min() {
-                let formatter = DateFormatter()
-                formatter.dateFormat = calendar.isDateInToday(earliest) ? "h:mm a" : "EEE h:mm a"
-                message = formatter.string(from: earliest)
-            } else {
-                message = "All done for today"
-            }
+            let formatter = DateFormatter()
 
-            WCSession.default.sendMessage(
-                ["nextCheckIn": message],
-                replyHandler: nil,
-                errorHandler: nil
-            )
+            if hasReadySlot, let rTime = readyTime, let rDeadline = readyDeadline {
+                formatter.dateFormat = "h:mm a"
+                WCSession.default.sendMessage(
+                    [
+                        "status": "ready",
+                        "nextCheckIn": formatter.string(from: rTime),
+                        "deadline": formatter.string(from: rDeadline)
+                    ],
+                    replyHandler: nil,
+                    errorHandler: nil
+                )
+            } else if let earliest = candidates.min() {
+                let isToday = calendar.isDateInToday(earliest)
+                formatter.dateFormat = isToday ? "h:mm a" : "EEE h:mm a"
+                WCSession.default.sendMessage(
+                    [
+                        "status": "waiting",
+                        "nextCheckIn": formatter.string(from: earliest)
+                    ],
+                    replyHandler: nil,
+                    errorHandler: nil
+                )
+            } else {
+                WCSession.default.sendMessage(
+                    [
+                        "status": "done",
+                        "nextCheckIn": "All done for today"
+                    ],
+                    replyHandler: nil,
+                    errorHandler: nil
+                )
+            }
         } catch {
             // Non-fatal — watch will show stale data until next sync
         }
