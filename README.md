@@ -48,5 +48,4 @@ For full functionality, enable the following when prompted:
 - WatchConnectivity messages are not always reliable and may fail when the session is inactive.  
 - UI updates may briefly appear delayed due to asynchronous data loading.  
 - Location features depend on user permission and device availability.  
-- Each new feature impacted other parts of the system that were previously assumed stable.  
 - The current escalation system relies on the check in user’s device, meaning alerts may fail if the device is off or the app is terminated.  
